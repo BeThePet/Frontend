@@ -1,0 +1,351 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 350 100% 97%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 351 100% 86%;
+    --primary-foreground: 355.7 100% 97.3%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 351 100% 86%;
+
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    background-color: theme("colors.pink.50");
+    font-family: var(--font-nunito), sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+    min-height: 100vh;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto; /* 스크롤 허용 */
+  }
+
+  html {
+    height: 100%;
+    width: 100%;
+    overflow-y: auto; /* 스크롤 허용 */
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: bold;
+  }
+}
+
+/* iOS-style input styling */
+input,
+textarea,
+select {
+  @apply appearance-none;
+}
+
+/* iOS-style button styling */
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS-style safe area insets */
+.safe-area-inset-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.safe-area-inset-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+/* iOS-style momentum scrolling */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS-style animations */
+.ios-transition {
+  transition: all 0.35s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Animations */
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* 파스텔톤 색상 팔레트 */
+.bg-pink-pastel {
+  background-color: #ffd6e5;
+}
+
+.bg-blue-pastel {
+  background-color: #d6e5ff;
+}
+
+.bg-mint-pastel {
+  background-color: #d6ffe5;
+}
+
+.bg-lavender-pastel {
+  background-color: #e5d6ff;
+}
+
+.bg-yellow-pastel {
+  background-color: #fff3d6;
+}
+
+.bg-peach-pastel {
+  background-color: #ffe5d6;
+}
+
+.bg-teal-pastel {
+  background-color: #d6fff7;
+}
+
+.bg-lime-pastel {
+  background-color: #eaffd6;
+}
+
+/* 버튼 스타일 */
+.btn-rounded {
+  @apply rounded-full shadow-md transition-all duration-300 active:scale-95 font-bold border-2;
+}
+
+.input-field {
+  @apply bg-white border-2 border-pink-200 rounded-xl px-4 py-3 text-gray-800 font-medium shadow-sm focus:border-pink-400 focus:ring-2 focus:ring-pink-200 focus:outline-none;
+}
+
+.card-container {
+  @apply bg-white rounded-3xl shadow-md p-5 border border-pink-100;
+}
+
+/* MBTI 카드 스타일 */
+.mbti-card {
+  @apply rounded-2xl shadow-md p-4 border border-opacity-20 transition-transform hover:scale-[1.02];
+}
+
+/* 선택형 버튼 UI */
+.selection-button {
+  @apply px-4 py-2 rounded-full border-2 border-pink-200 text-gray-700 font-medium transition-colors;
+}
+
+.selection-button-active {
+  @apply bg-pink-400 border-pink-400 text-white;
+}
+
+/* MBTI 결과 화면 스타일 */
+.mbti-result-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.mbti-result-card {
+  width: 100%;
+}
+
+.mbti-result-details {
+  width: 100%;
+  overflow-y: auto;
+}
+
+/* 대시보드 레이아웃 */
+.dashboard-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* 모바일 최적화 스타일 */
+@layer utilities {
+  /* Text contrast helpers */
+  .text-contrast-high {
+    color: rgba(0, 0, 0, 0.87);
+  }
+
+  .text-contrast-medium {
+    color: rgba(0, 0, 0, 0.6);
+  }
+
+  .text-contrast-low {
+    color: rgba(0, 0, 0, 0.38);
+  }
+
+  .text-contrast-white {
+    color: rgba(255, 255, 255, 0.87);
+  }
+
+  /* Background with text contrast */
+  .bg-with-text {
+    position: relative;
+  }
+
+  .bg-with-text::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.3));
+    z-index: 0;
+    border-radius: inherit;
+  }
+
+  .bg-with-text > * {
+    position: relative;
+    z-index: 1;
+  }
+  .mobile-container {
+    max-width: 100%;
+    width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .mobile-scroll {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    height: 100%;
+  }
+
+  /* 아이폰 노치 영역 대응 */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top, 0);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  /* 스크롤 문제 해결을 위한 스타일 */
+  .overflow-scroll-auto {
+    -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 1.5rem);
+  }
+
+  /* 앱 전체 레이아웃 통일성을 위한 스타일 */
+  .app-container {
+    max-width: 430px;
+    margin: 0 auto;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .app-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 5rem;
+  }
+
+  /* 통일된 카드 스타일 */
+  .app-card {
+    @apply bg-white rounded-xl shadow-sm border border-pink-100 p-4;
+  }
+
+  /* 통일된 헤더 스타일 */
+  .app-header {
+    @apply p-4 flex items-center shadow-md;
+  }
+
+  /* Scale animations */
+  .active\:scale-98:active {
+    transform: scale(0.98);
+  }
+
+  .button-safe-position {
+    position: fixed;
+    bottom: calc(5rem + env(safe-area-inset-bottom, 1rem));
+    right: 1rem;
+    z-index: 40;
+  }
+
+  /* Ensure content doesn't get hidden behind fixed elements */
+  .pb-safe-with-button {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 1.5rem));
+  }
+}
