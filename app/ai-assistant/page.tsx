@@ -18,8 +18,9 @@ export default function AIAssistantPage() {
   const [petInfo, setPetInfo] = useState<any>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const searchParams = useSearchParams()
+  const [processedQuery, setProcessedQuery] = useState<string | null>(null)
 
-  // 초기 메시지 설정 부분을 두 개의 useEffect로 분리
+  // 초기 메시지 설정
   useEffect(() => {
     // 반려견 정보 불러오기
     const savedPetInfo = getData("petInfo")
@@ -36,25 +37,28 @@ export default function AIAssistantPage() {
         }에 대해 어떤 도움이 필요하신가요?`,
       },
     ])
-  }, []) // 빈 의존성 배열로 컴포넌트 마운트 시 한 번만 실행
 
-  // URL 파라미터 처리를 위한 별도의 useEffect
-  useEffect(() => {
-    // URL 파라미터에서 질문 가져오기
-    const q = searchParams.get("q")
-    if (q) {
-      // 이미 처리된 질문인지 확인하기 위한 커스텀 속성 사용
-      const processedQuery = sessionStorage.getItem("processedQuery")
-      if (processedQuery !== q) {
-        sessionStorage.setItem("processedQuery", q)
-        // 약간의 지연을 두어 초기 메시지가 설정된 후 실행
-        setTimeout(() => {
-          setInput(q)
-          handleSendMessage(q)
-        }, 100)
-      }
+    // sessionStorage 초기화
+    if (typeof window !== 'undefined') {
+      const storedQuery = sessionStorage.getItem("processedQuery")
+      setProcessedQuery(storedQuery)
     }
-  }, [searchParams]) // searchParams가 변경될 때만 실행
+  }, [])
+
+  // URL 파라미터 처리
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const q = searchParams.get("q")
+    if (q && q !== processedQuery) {
+      sessionStorage.setItem("processedQuery", q)
+      setProcessedQuery(q)
+      setTimeout(() => {
+        setInput(q)
+        handleSendMessage(q)
+      }, 100)
+    }
+  }, [searchParams, processedQuery])
 
   // 메시지 스크롤 자동 이동
   useEffect(() => {

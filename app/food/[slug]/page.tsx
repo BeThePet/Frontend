@@ -5,6 +5,14 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, AlertTriangle } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
+export function generateStaticParams() {
+  return [
+    { slug: 'royal-canin-mini-adult' },
+    { slug: 'hills-science-diet' },
+    { slug: 'purina-pro-plan' }
+  ]
+}
+
 export default function FoodDetailPage({ params }: { params: { slug: string } }) {
   // 실제로는 slug를 기반으로 데이터를 가져와야 합니다
   const foodData = {

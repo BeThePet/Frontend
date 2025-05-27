@@ -225,3 +225,10 @@ export default function ManagePetInfoPage() {
     } catch (error) {
       console.error("물 섭취 기록 저장 중 오류 발생:", error)
       toast({
+        title: "저장 오류",
+        description: "물 섭취 기록을 저장하는 중 문제가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
+  }
+}
