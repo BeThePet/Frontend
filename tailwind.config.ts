@@ -60,6 +60,12 @@ const config = {
           DEFAULT: "#FFB6C1",
           dark: "#FF69B4",
         },
+        beige: "#FFF8F0",
+        blue: {
+          light: "#E6F3FF",
+          DEFAULT: "#0066CC",
+          dark: "#004499",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

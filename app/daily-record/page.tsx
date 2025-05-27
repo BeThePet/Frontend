@@ -1,18 +1,17 @@
 "use client"
 
-import { useEffect } from "react"
-import { useRouter } from "next/navigation"
+import dynamic from 'next/dynamic'
 
-export default function DailyRecordRedirect() {
-  const router = useRouter()
-
-  useEffect(() => {
-    router.replace("/health-record?today=true")
-  }, [router])
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-pink-50">
-      <p className="text-gray-600">페이지 이동 중...</p>
+// 클라이언트 사이드에서만 로드되도록 동적 임포트
+const DailyRecordContent = dynamic(() => import('@/components/daily-record/DailyRecordContent'), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen bg-beige flex justify-center items-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
     </div>
   )
+})
+
+export default function DailyRecordPage() {
+  return <DailyRecordContent />
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { useToast } from "@/hooks/use-toast"
 import { Bell, BellOff, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -9,16 +10,19 @@ import { motion, AnimatePresence } from "framer-motion"
 import { requestNotificationPermission, getScheduledNotifications, cancelNotification } from "@/lib/notification"
 
 export default function NotificationManager() {
-  const [permissionStatus, setPermissionStatus] = useState<"default" | "granted" | "denied">("default")
+  const { toast } = useToast()
+  const [isSupported, setIsSupported] = useState(false)
+  const [permission, setPermission] = useState<NotificationPermission>("default")
   const [showPermissionCard, setShowPermissionCard] = useState(false)
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
 
-  // 알림 권한 상태 확인
   useEffect(() => {
+    // 클라이언트 사이드에서만 실행
     if (typeof window !== "undefined" && "Notification" in window) {
-      setPermissionStatus(Notification.permission)
-
+      setIsSupported(true)
+      setPermission(Notification.permission)
+      
       // 권한이 아직 요청되지 않았으면 카드 표시
       if (Notification.permission === "default") {
         setShowPermissionCard(true)
@@ -32,9 +36,26 @@ export default function NotificationManager() {
 
   // 알림 권한 요청 처리
   const handleRequestPermission = async () => {
-    const granted = await requestNotificationPermission()
-    setPermissionStatus(granted ? "granted" : "denied")
-    setShowPermissionCard(false)
+    try {
+      const result = await Notification.requestPermission()
+      setPermission(result)
+      setShowPermissionCard(false)
+      
+      if (result === "granted") {
+        toast({
+          title: "알림 설정 완료",
+          description: "이제 중요한 알림을 받아볼 수 있습니다.",
+        })
+      } else if (result === "denied") {
+        toast({
+          title: "알림이 차단되었습니다",
+          description: "브라우저 설정에서 알림을 허용해주세요.",
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error("알림 권한 요청 중 오류 발생:", error)
+    }
   }
 
   // 알림 취소 처리
@@ -48,7 +69,8 @@ export default function NotificationManager() {
     setShowNotifications(!showNotifications)
   }
 
-  if (!("Notification" in window)) {
+  // 브라우저 지원 여부 확인
+  if (!isSupported) {
     return null
   }
 
@@ -86,7 +108,7 @@ export default function NotificationManager() {
       </AnimatePresence>
 
       {/* 알림 관리 버튼 */}
-      {permissionStatus === "granted" && (
+      {permission === "granted" && (
         <div className="fixed bottom-20 right-4 z-40">
           <Button
             size="icon"

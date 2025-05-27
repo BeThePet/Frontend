@@ -2,9 +2,11 @@ import type React from "react"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 import MobileLayout from "@/components/mobile-layout"
+import NotificationManager from "@/components/notification-manager"
 import "./globals.css"
 import { Nunito } from "next/font/google"
 import InstallPwaScript from "@/components/install-pwa-script"
+import type { Metadata, Viewport } from "next"
 
 const nunito = Nunito({
   subsets: ["latin"],
@@ -12,11 +14,17 @@ const nunito = Nunito({
   variable: "--font-nunito",
 })
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "멍멍케어 - 반려견 헬스케어 앱",
   description: "우리 강아지의 건강을 더 똑똑하게 관리하세요",
-  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover",
-    generator: 'v0.dev'
+  generator: 'v0.dev'
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 }
 
 export default function RootLayout({
@@ -39,6 +47,7 @@ export default function RootLayout({
           <div className="app-container">
             <MobileLayout>{children}</MobileLayout>
             <Toaster />
+            <NotificationManager />
           </div>
         </ThemeProvider>
         <InstallPwaScript />
