@@ -27,20 +27,15 @@ export function NumberPicker({
   const [currentValue, setCurrentValue] = useState<number>(typeof initialValue === 'number' ? initialValue : 0)
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const lastReportedValue = useRef<number>(typeof initialValue === 'number' ? initialValue : 0)
 
-  // 값 변경 시 부모 컴포넌트에 알림
+  // 외부에서 값이 변경되면 내부 상태 업데이트 (초기값이나 props가 변경된 경우만)
   useEffect(() => {
-    if (typeof initialValue === 'number' && currentValue !== initialValue) {
-      onChange(currentValue)
-    }
-  }, [currentValue, onChange, initialValue])
-
-  // 외부에서 값이 변경되면 내부 상태 업데이트
-  useEffect(() => {
-    if (typeof initialValue === 'number') {
+    if (typeof initialValue === 'number' && initialValue !== currentValue) {
       setCurrentValue(initialValue)
+      lastReportedValue.current = initialValue
     }
-  }, [initialValue])
+  }, [initialValue, currentValue])
 
   // 숫자 배열 생성 (선택 가능한 값들)
   const generateNumbers = () => {
@@ -53,11 +48,20 @@ export function NumberPicker({
 
   const numbers = generateNumbers()
 
+  // 값 변경 시 부모 컴포넌트에 알림 (값이 실제로 변경된 경우만)
+  const reportValueChange = (newValue: number) => {
+    if (newValue !== lastReportedValue.current) {
+      lastReportedValue.current = newValue
+      onChange(newValue)
+    }
+  }
+
   // 값 증가
   const increment = () => {
     const newValue = Number((currentValue + step).toFixed(precision))
     if (newValue <= max) {
       setCurrentValue(newValue)
+      reportValueChange(newValue)
     }
   }
 
@@ -66,7 +70,15 @@ export function NumberPicker({
     const newValue = Number((currentValue - step).toFixed(precision))
     if (newValue >= min) {
       setCurrentValue(newValue)
+      reportValueChange(newValue)
     }
+  }
+
+  // 드롭다운에서 값 선택
+  const selectValue = (num: number) => {
+    setCurrentValue(num)
+    reportValueChange(num)
+    closePicker()
   }
 
   // 드롭다운 열기
@@ -144,10 +156,7 @@ export function NumberPicker({
                 className={`w-full px-4 py-2 text-left hover:bg-pink-50 transition-colors ${
                   num === currentValue ? "bg-pink-100 text-pink-600" : "text-gray-700"
                 }`}
-                onClick={() => {
-                  setCurrentValue(num)
-                  closePicker()
-                }}
+                onClick={() => selectValue(num)}
               >
                 {num.toFixed(precision === 0 ? 0 : precision)}
                 {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}

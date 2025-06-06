@@ -10,6 +10,9 @@ import { useSearchParams } from "next/navigation"
 import { getData } from "@/lib/storage"
 import HealthCheckForm from "@/components/health-record/HealthCheckForm"
 import WalkForm from "@/components/health-record/WalkForm"
+import FeedForm from "@/components/health-record/FeedForm"
+import WaterForm from "@/components/health-record/WaterForm"
+import WeightForm from "@/components/health-record/WeightForm"
 
 export default function HealthRecordPage() {
   const searchParams = useSearchParams()
@@ -119,21 +122,30 @@ export default function HealthRecordPage() {
 
           {/* 다른 탭들은 나중에 구현 */}
           <TabsContent value="feed" className="mt-4">
-            <div className="text-center py-8 text-gray-500">
-              사료 급여 기록 기능은 현재 개발 중입니다.
-            </div>
+            <FeedForm
+              petId={petInfo.id}
+              onComplete={() => {
+                // 필요한 경우 추가 작업 수행
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="water" className="mt-4">
-            <div className="text-center py-8 text-gray-500">
-              물 섭취 기록 기능은 현재 개발 중입니다.
-            </div>
+            <WaterForm
+              petId={petInfo.id}
+              onComplete={() => {
+                // 필요한 경우 추가 작업 수행
+              }}
+            />
           </TabsContent>
 
           <TabsContent value="weight" className="mt-4">
-            <div className="text-center py-8 text-gray-500">
-              체중 기록 기능은 현재 개발 중입니다.
-            </div>
+            <WeightForm
+              petId={petInfo.id}
+              onComplete={() => {
+                // 필요한 경우 추가 작업 수행
+              }}
+            />
           </TabsContent>
         </Tabs>
       </motion.div>

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { MapPin } from "lucide-react"
+import { Droplets } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -9,25 +9,23 @@ import { useToast } from "@/hooks/use-toast"
 import { getData, saveData } from "@/lib/storage"
 import { NumberPicker } from "@/components/number-picker"
 
-interface WalkFormProps {
+interface WaterFormProps {
   petId: string
   onComplete?: () => void
 }
 
-interface WalkData {
-  distance_km: number
-  duration_min: number
+interface WaterData {
+  amount_ml: number
 }
 
-export default function WalkForm({ petId, onComplete }: WalkFormProps) {
+export default function WaterForm({ petId, onComplete }: WaterFormProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [completedToday, setCompletedToday] = useState(false)
   const [petInfo, setPetInfo] = useState<any>(null)
-  const [formData, setFormData] = useState<WalkData>({
-    distance_km: 1.5,
-    duration_min: 30,
+  const [formData, setFormData] = useState<WaterData>({
+    amount_ml: 200,
   })
 
   // today 값을 메모이제이션
@@ -47,14 +45,14 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
           setPetInfo(savedPetInfo)
         }
 
-        // 오늘 산책 기록 확인
-        const savedWalkData = getData<WalkData>(`walk_${today}`)
-        if (savedWalkData && isMounted) {
-          setFormData(savedWalkData)
+        // 오늘 물 섭취 기록 확인
+        const savedWaterData = getData<WaterData>(`water_${today}`)
+        if (savedWaterData && isMounted) {
+          setFormData(savedWaterData)
           setCompletedToday(true)
         }
       } catch (error) {
-        console.error("산책 기록 데이터 로드 실패:", error)
+        console.error("물 섭취 기록 데이터 로드 실패:", error)
       } finally {
         if (isMounted) {
           setIsLoading(false)
@@ -69,21 +67,17 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
     }
   }, [today])
 
-  // onChange 핸들러들을 useCallback으로 메모이제이션
-  const handleDistanceChange = useCallback((value: number) => {
-    setFormData(prev => ({ ...prev, distance_km: value }))
-  }, [])
-
-  const handleDurationChange = useCallback((value: number) => {
-    setFormData(prev => ({ ...prev, duration_min: value }))
+  // onChange 핸들러를 useCallback으로 메모이제이션
+  const handleAmountChange = useCallback((value: number) => {
+    setFormData(prev => ({ ...prev, amount_ml: value }))
   }, [])
 
   // 폼 제출 핸들러
   const handleSubmit = async () => {
-    if (formData.distance_km <= 0 || formData.duration_min <= 0) {
+    if (formData.amount_ml <= 0) {
       toast({
-        title: "산책 정보를 입력해주세요",
-        description: "거리와 시간을 모두 입력해주세요.",
+        title: "물 섭취량을 입력해주세요",
+        description: "올바른 물 섭취량을 입력해주세요.",
         variant: "destructive",
       })
       return
@@ -92,7 +86,7 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
     setIsSubmitting(true)
     try {
       // 로컬 스토리지에 저장
-      saveData(`walk_${today}`, formData)
+      saveData(`water_${today}`, formData)
 
       // 건강 데이터에 활동 추가
       const healthData = getData("healthData") as any || { activities: [], healthChecks: [] }
@@ -101,22 +95,24 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
         healthChecks: healthData.healthChecks || [],
       }
 
+      const now = new Date()
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+
       const newActivity = {
-        type: "walk" as const,
+        type: "water" as const,
         date: today,
-        time: new Date().toTimeString().slice(0, 5),
-        description: `산책 ${formData.distance_km}km, ${formData.duration_min}분`,
-        distance_km: formData.distance_km,
-        duration_min: formData.duration_min,
+        time: currentTime,
+        description: `물 섭취 ${formData.amount_ml}ml`,
+        amount_ml: formData.amount_ml,
       }
 
-      // 기존 산책 기록이 있다면 업데이트, 없다면 추가
-      const existingWalkIndex = updatedHealthData.activities.findIndex(
-        (activity: any) => activity.type === "walk" && activity.date === today
+      // 기존 물 섭취 기록이 있다면 업데이트, 없다면 추가
+      const existingWaterIndex = updatedHealthData.activities.findIndex(
+        (activity: any) => activity.type === "water" && activity.date === today
       )
 
-      if (existingWalkIndex >= 0) {
-        updatedHealthData.activities[existingWalkIndex] = newActivity
+      if (existingWaterIndex >= 0) {
+        updatedHealthData.activities[existingWaterIndex] = newActivity
       } else {
         updatedHealthData.activities = [newActivity, ...updatedHealthData.activities]
       }
@@ -125,16 +121,16 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
       setCompletedToday(true)
       
       toast({
-        title: completedToday ? "산책 기록 수정 완료" : "산책 기록 완료",
-        description: "오늘의 산책이 기록되었습니다.",
+        title: completedToday ? "물 섭취 기록 수정 완료" : "물 섭취 기록 완료",
+        description: "오늘의 물 섭취량이 기록되었습니다.",
       })
       
       onComplete?.()
     } catch (error) {
-      console.error("산책 기록 저장 실패:", error)
+      console.error("물 섭취 기록 저장 실패:", error)
       toast({
         title: "저장 실패",
-        description: "산책 기록을 저장하는데 실패했습니다.",
+        description: "물 섭취 기록을 저장하는데 실패했습니다.",
         variant: "destructive",
       })
     } finally {
@@ -145,8 +141,7 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
   // 폼 초기화
   const resetForm = () => {
     setFormData({
-      distance_km: 1.5,
-      duration_min: 30,
+      amount_ml: 200,
     })
     setCompletedToday(false)
   }
@@ -154,7 +149,7 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <p className="text-gray-600">산책 기록 데이터를 불러오는 중...</p>
+        <p className="text-gray-600">물 섭취 기록 데이터를 불러오는 중...</p>
       </div>
     )
   }
@@ -164,21 +159,21 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
       <CardContent className="p-5">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-            <MapPin className="w-6 h-6 text-blue-500" />
+            <Droplets className="w-6 h-6 text-blue-500" />
           </div>
           <div>
             <h2 className="text-lg font-semibold text-gray-800">
-              {petInfo?.name || "반려견"}의 산책 기록
+              {petInfo?.name || "반려견"}의 물 섭취 기록
             </h2>
-            <p className="text-sm text-gray-600">오늘의 산책 거리와 시간을 기록하세요.</p>
+            <p className="text-sm text-gray-600">오늘 마신 물의 양을 기록하세요.</p>
           </div>
         </div>
 
         {completedToday ? (
           <div className="bg-green-50 p-4 rounded-lg mb-4 text-center">
-            <p className="text-green-700 font-medium">오늘의 산책 기록을 완료했습니다! 🚶‍♂️</p>
+            <p className="text-green-700 font-medium">오늘의 물 섭취 기록을 완료했습니다! 💧</p>
             <p className="text-sm text-gray-600 mt-1">
-              {formData.distance_km}km, {formData.duration_min}분 산책
+              {formData.amount_ml}ml 섭취
             </p>
             <Button variant="outline" className="mt-2" onClick={resetForm}>
               기록 수정하기
@@ -187,36 +182,33 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
         ) : null}
 
         <div className="space-y-4 mt-4">
-          {/* 산책 거리 */}
+          {/* 물 섭취량 */}
           <div className="space-y-2">
-            <Label>산책 거리</Label>
+            <Label>물 섭취량</Label>
             <div className="flex justify-center">
               <NumberPicker
-                value={formData.distance_km}
-                onChange={handleDistanceChange}
-                min={0.1}
-                max={10}
-                step={0.1}
-                unit="km"
-                precision={1}
+                value={formData.amount_ml}
+                onChange={handleAmountChange}
+                min={50}
+                max={1000}
+                step={50}
+                unit="ml"
+                precision={0}
               />
             </div>
           </div>
 
-          {/* 산책 시간 */}
-          <div className="space-y-2">
-            <Label>산책 시간</Label>
-            <div className="flex justify-center">
-              <NumberPicker
-                value={formData.duration_min}
-                onChange={handleDurationChange}
-                min={5}
-                max={180}
-                step={5}
-                unit="분"
-                precision={0}
-              />
-            </div>
+          {/* 권장 섭취량 안내 */}
+          <div className="bg-blue-50 p-3 rounded-lg">
+            <p className="text-sm text-blue-700 font-medium">💡 권장 물 섭취량</p>
+            <p className="text-sm text-blue-600 mt-1">
+              일반적으로 체중 1kg당 50-60ml가 권장됩니다.
+              {petInfo?.weight && (
+                <span className="block mt-1">
+                  {petInfo.name}의 권장량: {Math.round(petInfo.weight * 50)}-{Math.round(petInfo.weight * 60)}ml
+                </span>
+              )}
+            </p>
           </div>
         </div>
 
@@ -226,7 +218,7 @@ export default function WalkForm({ petId, onComplete }: WalkFormProps) {
             onClick={handleSubmit}
             disabled={isSubmitting}
           >
-            {isSubmitting ? "저장 중..." : "산책 기록하기"}
+            {isSubmitting ? "저장 중..." : "물 섭취 기록하기"}
           </Button>
         )}
       </CardContent>
