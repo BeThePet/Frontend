@@ -12,22 +12,36 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useToast } from "@/hooks/use-toast"
+import { saveData, getData } from "@/lib/storage"
 import { motion } from "framer-motion"
-import { emergencyApi, type HospitalDetail, type HospitalCreateRequest } from "@/lib/api"
 
-export default function HospitalContent() {
+// 병원 정보 타입 정의
+type HospitalType = "emergency" | "regular" | "specialist"
+
+interface HospitalInfo {
+  id: string
+  name: string
+  phone: string
+  address: string
+  type: HospitalType
+  hours?: string
+  notes?: string
+  isEmergency: boolean
+  specialties?: string[]
+}
+
+export default function HospitalManagementPage() {
   const { toast } = useToast()
-  const [hospitals, setHospitals] = useState<HospitalDetail[]>([])
+  const [hospitals, setHospitals] = useState<HospitalInfo[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
-  const [editingHospital, setEditingHospital] = useState<HospitalDetail | null>(null)
+  const [editingHospital, setEditingHospital] = useState<HospitalInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // 폼 상태
   const [name, setName] = useState("")
   const [phone, setPhone] = useState("")
   const [address, setAddress] = useState("")
-  const [type, setType] = useState("일반 병원")
+  const [type, setType] = useState<HospitalType>("regular")
   const [hours, setHours] = useState("")
   const [notes, setNotes] = useState("")
   const [isEmergency, setIsEmergency] = useState(false)
@@ -39,8 +53,49 @@ export default function HospitalContent() {
     const loadData = async () => {
       try {
         setIsLoading(true)
-        const hospitalData = await emergencyApi.getAllHospitalDetails()
-        setHospitals(hospitalData)
+        const savedHospitals = getData("hospitalInfo")
+        if (savedHospitals) {
+          setHospitals(savedHospitals)
+        } else {
+          // 샘플 데이터
+          const sampleHospitals: HospitalInfo[] = [
+            {
+              id: "1",
+              name: "24시 동물메디컬센터",
+              phone: "02-1234-5678",
+              address: "서울시 강남구 테헤란로 123",
+              type: "emergency",
+              hours: "24시간",
+              notes: "응급 수술 가능",
+              isEmergency: true,
+              specialties: ["응급 처치", "중환자실"],
+            },
+            {
+              id: "2",
+              name: "우리동네 동물병원",
+              phone: "02-9876-5432",
+              address: "서울시 서초구 서초대로 456",
+              type: "regular",
+              hours: "평일 09:00-18:00, 토요일 09:00-13:00",
+              notes: "정기 검진 및 예방 접종",
+              isEmergency: false,
+              specialties: ["일반 진료", "예방 접종"],
+            },
+            {
+              id: "3",
+              name: "특수동물 전문센터",
+              phone: "02-5555-1234",
+              address: "서울시 용산구 이태원로 789",
+              type: "specialist",
+              hours: "평일 10:00-19:00",
+              notes: "특수동물 및 야생동물 전문",
+              isEmergency: false,
+              specialties: ["특수동물", "야생동물", "이국적 동물"],
+            },
+          ]
+          setHospitals(sampleHospitals)
+          saveData("hospitalInfo", sampleHospitals)
+        }
       } catch (error) {
         console.error("병원 정보를 불러오는 중 오류가 발생했습니다:", error)
         toast({
@@ -57,7 +112,7 @@ export default function HospitalContent() {
   }, [toast])
 
   // 병원 추가 또는 수정
-  const handleSaveHospital = async () => {
+  const handleSaveHospital = () => {
     if (!name || !phone) {
       toast({
         title: "필수 정보를 입력해주세요",
@@ -68,31 +123,42 @@ export default function HospitalContent() {
     }
 
     try {
-      setIsSubmitting(true)
-      
-      const hospitalData: HospitalCreateRequest = {
-        name,
-        phone,
-        address,
-        type,
-        hours,
-        notes,
-        is_emergency: isEmergency,
-        specialties,
-      }
-
       if (editingHospital) {
         // 병원 정보 수정
-        const updatedHospital = await emergencyApi.updateHospital(editingHospital.id, hospitalData)
         const updatedHospitals = hospitals.map((hospital) =>
-          hospital.id === editingHospital.id ? updatedHospital : hospital
+          hospital.id === editingHospital.id
+            ? {
+                ...hospital,
+                name,
+                phone,
+                address,
+                type,
+                hours,
+                notes,
+                isEmergency,
+                specialties,
+              }
+            : hospital,
         )
         setHospitals(updatedHospitals)
+        saveData("hospitalInfo", updatedHospitals)
         toast({ title: "병원 정보가 수정되었습니다" })
       } else {
         // 새 병원 추가
-        const newHospital = await emergencyApi.createHospital(hospitalData)
-        setHospitals([...hospitals, newHospital])
+        const newHospital: HospitalInfo = {
+          id: Date.now().toString(),
+          name,
+          phone,
+          address,
+          type,
+          hours,
+          notes,
+          isEmergency,
+          specialties,
+        }
+        const updatedHospitals = [...hospitals, newHospital]
+        setHospitals(updatedHospitals)
+        saveData("hospitalInfo", updatedHospitals)
         toast({ title: "병원이 추가되었습니다" })
       }
 
@@ -105,18 +171,16 @@ export default function HospitalContent() {
         description: "병원 정보를 저장하는 중 문제가 발생했습니다.",
         variant: "destructive",
       })
-    } finally {
-      setIsSubmitting(false)
     }
   }
 
   // 병원 삭제
-  const handleDeleteHospital = async (id: number) => {
+  const handleDeleteHospital = (id: string) => {
     try {
       if (confirm("정말로 이 병원 정보를 삭제하시겠습니까?")) {
-        await emergencyApi.deleteHospital(id)
         const updatedHospitals = hospitals.filter((hospital) => hospital.id !== id)
         setHospitals(updatedHospitals)
+        saveData("hospitalInfo", updatedHospitals)
         toast({ title: "병원 정보가 삭제되었습니다" })
       }
     } catch (error) {
@@ -130,7 +194,7 @@ export default function HospitalContent() {
   }
 
   // 병원 수정 시작
-  const handleEditHospital = (hospital: HospitalDetail) => {
+  const handleEditHospital = (hospital: HospitalInfo) => {
     setEditingHospital(hospital)
     setName(hospital.name)
     setPhone(hospital.phone)
@@ -138,7 +202,7 @@ export default function HospitalContent() {
     setType(hospital.type)
     setHours(hospital.hours || "")
     setNotes(hospital.notes || "")
-    setIsEmergency(hospital.is_emergency)
+    setIsEmergency(hospital.isEmergency)
     setSpecialties(hospital.specialties || [])
     setShowAddForm(true)
   }
@@ -148,7 +212,7 @@ export default function HospitalContent() {
     setName("")
     setPhone("")
     setAddress("")
-    setType("일반 병원")
+    setType("regular")
     setHours("")
     setNotes("")
     setIsEmergency(false)
@@ -169,9 +233,9 @@ export default function HospitalContent() {
   // 필터링된 병원 목록
   const filteredHospitals = hospitals.filter((hospital) => {
     if (activeTab === "all") return true
-    if (activeTab === "emergency") return hospital.is_emergency
-    if (activeTab === "regular") return hospital.type === "일반 병원"
-    if (activeTab === "specialist") return hospital.type === "전문 병원"
+    if (activeTab === "emergency") return hospital.isEmergency
+    if (activeTab === "regular") return hospital.type === "regular"
+    if (activeTab === "specialist") return hospital.type === "specialist"
     return true
   })
 
@@ -211,7 +275,6 @@ export default function HospitalContent() {
                       onChange={(e) => setName(e.target.value)}
                       placeholder="병원 이름을 입력하세요"
                       className="rounded-lg border-gray-300"
-                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -225,7 +288,6 @@ export default function HospitalContent() {
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="전화번호를 입력하세요"
                       className="rounded-lg border-gray-300"
-                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -237,24 +299,23 @@ export default function HospitalContent() {
                       onChange={(e) => setAddress(e.target.value)}
                       placeholder="주소를 입력하세요"
                       className="rounded-lg border-gray-300"
-                      disabled={isSubmitting}
                     />
                   </div>
 
                   <div className="space-y-2">
                     <Label>병원 유형</Label>
-                    <RadioGroup value={type} onValueChange={setType} disabled={isSubmitting}>
+                    <RadioGroup value={type} onValueChange={(value) => setType(value as HospitalType)}>
                       <div className="flex flex-wrap gap-4">
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="일반 병원" id="regular" />
+                          <RadioGroupItem value="regular" id="regular" />
                           <Label htmlFor="regular">일반 병원</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="응급 병원" id="emergency" />
+                          <RadioGroupItem value="emergency" id="emergency" />
                           <Label htmlFor="emergency">응급 병원</Label>
                         </div>
                         <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="전문 병원" id="specialist" />
+                          <RadioGroupItem value="specialist" id="specialist" />
                           <Label htmlFor="specialist">전문 병원</Label>
                         </div>
                       </div>
@@ -268,7 +329,6 @@ export default function HospitalContent() {
                       checked={isEmergency}
                       onChange={(e) => setIsEmergency(e.target.checked)}
                       className="rounded border-gray-300"
-                      disabled={isSubmitting}
                     />
                     <Label htmlFor="isEmergency">24시간 응급 진료 가능</Label>
                   </div>
@@ -281,7 +341,6 @@ export default function HospitalContent() {
                       onChange={(e) => setHours(e.target.value)}
                       placeholder="예: 평일 09:00-18:00, 주말 휴무"
                       className="rounded-lg border-gray-300"
-                      disabled={isSubmitting}
                     />
                   </div>
 
@@ -293,8 +352,8 @@ export default function HospitalContent() {
                           <Badge
                             key={specialty}
                             variant={specialties.includes(specialty) ? "default" : "outline"}
-                            className={`cursor-pointer ${specialties.includes(specialty) ? "bg-pink-DEFAULT" : ""} ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
-                            onClick={() => !isSubmitting && toggleSpecialty(specialty)}
+                            className={`cursor-pointer ${specialties.includes(specialty) ? "bg-pink-DEFAULT" : ""}`}
+                            onClick={() => toggleSpecialty(specialty)}
                           >
                             {specialty}
                           </Badge>
@@ -311,28 +370,16 @@ export default function HospitalContent() {
                       onChange={(e) => setNotes(e.target.value)}
                       placeholder="추가 정보를 입력하세요"
                       className="rounded-lg border-gray-300 min-h-[100px]"
-                      disabled={isSubmitting}
                     />
                   </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" className="flex-1" onClick={resetForm} disabled={isSubmitting}>
+                  <Button variant="outline" className="flex-1" onClick={resetForm}>
                     취소
                   </Button>
-                  <Button 
-                    className="flex-1 bg-pink-DEFAULT hover:bg-pink-dark text-white" 
-                    onClick={handleSaveHospital}
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center gap-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        {editingHospital ? "수정 중..." : "추가 중..."}
-                      </div>
-                    ) : (
-                      editingHospital ? "수정하기" : "추가하기"
-                    )}
+                  <Button className="flex-1 bg-pink-DEFAULT hover:bg-pink-dark text-white" onClick={handleSaveHospital}>
+                    {editingHospital ? "수정하기" : "추가하기"}
                   </Button>
                 </div>
               </CardContent>
@@ -371,7 +418,7 @@ export default function HospitalContent() {
                     >
                       <Card
                         className={`bg-white rounded-xl shadow-sm ${
-                          hospital.is_emergency ? "border-l-4 border-l-red-500" : ""
+                          hospital.isEmergency ? "border-l-4 border-l-red-500" : ""
                         }`}
                       >
                         <CardContent className="p-4">
@@ -379,12 +426,12 @@ export default function HospitalContent() {
                             <div>
                               <div className="flex items-center gap-2">
                                 <h3 className="font-semibold text-gray-800">{hospital.name}</h3>
-                                {hospital.is_emergency && (
+                                {hospital.isEmergency && (
                                   <Badge variant="destructive" className="bg-red-500">
                                     24시
                                   </Badge>
                                 )}
-                                {hospital.type === "전문 병원" && (
+                                {hospital.type === "specialist" && (
                                   <Badge variant="secondary" className="bg-lavender-light text-gray-800">
                                     전문
                                   </Badge>
@@ -482,4 +529,4 @@ export default function HospitalContent() {
       </div>
     </div>
   )
-} 
+}
