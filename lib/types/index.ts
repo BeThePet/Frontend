@@ -52,6 +52,59 @@ export interface HealthRecord {
   updatedAt: string
 }
 
+export interface HealthCheck {
+  id: string
+  petId: string
+  date: string
+  items: HealthCheckItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface HealthCheckItem {
+  checked: boolean
+  value: string | number
+  status?: "normal" | "warning" | "danger"
+}
+
+export interface HealthCheckFormData {
+  items: {
+    poop: HealthCheckItem
+    pee: HealthCheckItem
+    sleep: HealthCheckItem
+    temperature: HealthCheckItem
+    appetite: HealthCheckItem
+    water: HealthCheckItem
+    activity: HealthCheckItem
+    mood: HealthCheckItem
+    skin: HealthCheckItem
+    eye: HealthCheckItem
+    ear: HealthCheckItem
+    nose: HealthCheckItem
+    mouth: HealthCheckItem
+    vomit: HealthCheckItem
+    cough: HealthCheckItem
+    medicine: HealthCheckItem
+  }
+  memo: string
+}
+
+export interface WalkRecord {
+  id: string
+  petId: string
+  date: string
+  time: string
+  distance: number  // km
+  duration: number  // minutes
+  createdAt: string
+  updatedAt: string
+}
+
+export interface WalkFormData {
+  distance: number
+  duration: number
+}
+
 export interface ApiResponse<T> {
   data: T
   error?: string

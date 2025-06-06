@@ -10,12 +10,20 @@ import { Heart, Activity, Stethoscope, Shield } from "lucide-react"
 export default function OnboardingContent() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    // 로그인 상태 확인 (실제 구현에서는 서버에서 확인)
+    const checkLoginStatus = () => {
+      const token = localStorage.getItem('token')
+      setIsLoggedIn(!!token)
+    }
+    checkLoginStatus()
   }, [])
 
   const handleStartClick = () => {
+    // 로그인 상태와 관계없이 대시보드로 이동
     router.push("/dashboard")
   }
 

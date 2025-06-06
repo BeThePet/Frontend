@@ -19,6 +19,9 @@ import {
   Clipboard,
   Settings,
   LogOut,
+  Activity,
+  AlertTriangle,
+  Utensils,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -65,12 +68,12 @@ export default function DashboardContent() {
     loadData()
   }, [])
 
-  // 반려견 정보가 없고 로딩이 완료된 경우에만 리디렉션
+  // 반려견 정보가 없고 로그인 상태일 때만 리디렉션
   useEffect(() => {
-    if (!isLoading && !petInfo && mounted) {
+    if (!isLoading && !petInfo && mounted && isLoggedIn) {
       router.push("/info")
     }
-  }, [isLoading, petInfo, mounted, router])
+  }, [isLoading, petInfo, mounted, router, isLoggedIn])
 
   // 로딩 중이면 로딩 화면 표시
   if (!mounted || isLoading) {
@@ -115,23 +118,49 @@ export default function DashboardContent() {
                   </div>
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800">댕댕이</h2>
+                  <h2 className="text-xl font-bold text-gray-800">데모 프로필</h2>
                   <div className="flex items-center gap-2 mt-1">
                     <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      포메라니안
+                      체험용
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-4 mt-2">
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Bone className="w-4 h-4" />
-                      <span>3살</span>
-                    </div>
-                    <div className="flex items-center gap-1 text-sm text-gray-600">
-                      <Scale className="w-4 h-4" />
-                      <span>4.2kg</span>
-                    </div>
-                  </div>
+                  <p className="text-sm text-gray-600 mt-2">
+                    로그인하고 나만의 반려견 프로필을 만들어보세요!
+                  </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 주요 기능 카드 */}
+          <Card className="bg-white rounded-xl shadow-sm">
+            <CardContent className="p-5">
+              <h3 className="font-bold text-gray-800 mb-4">주요 기능 둘러보기</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <Link href="/health-record">
+                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
+                    <Activity className="w-5 h-5 text-blue-500" />
+                    <span className="text-sm">건강 기록</span>
+                  </Button>
+                </Link>
+                <Link href="/medication">
+                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
+                    <Pill className="w-5 h-5 text-purple-500" />
+                    <span className="text-sm">약 복용 관리</span>
+                  </Button>
+                </Link>
+                <Link href="/food">
+                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
+                    <Utensils className="w-5 h-5 text-green-500" />
+                    <span className="text-sm">사료 정보</span>
+                  </Button>
+                </Link>
+                <Link href="/emergency">
+                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
+                    <span className="text-sm">긴급 상황</span>
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
@@ -140,143 +169,14 @@ export default function DashboardContent() {
           <Card className="bg-white rounded-xl shadow-sm border-pink-100">
             <CardContent className="p-5">
               <div className="text-center">
-                <h3 className="font-bold text-gray-800 mb-2">나만의 반려견 프로필 만들기</h3>
+                <h3 className="font-bold text-gray-800 mb-2">더 많은 기능을 이용하세요</h3>
                 <p className="text-sm text-gray-600 mb-4">
                   로그인하고 반려견 정보를 등록하면<br />
-                  더 많은 기능을 이용할 수 있어요
+                  맞춤형 건강 관리 서비스를 이용할 수 있어요
                 </p>
                 <Link href="/login">
                   <Button className="w-full bg-pink-500 hover:bg-pink-600">
                     로그인하고 시작하기
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 기존 건강 관리 메뉴와 기타 섹션들 (읽기 전용) */}
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg font-semibold text-gray-800">건강 관리</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/health-record?tab=health&today=true">
-                  <Button className="w-full h-20 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-700 flex flex-col items-center justify-center">
-                    <Calendar className="w-5 h-5 mb-1" />
-                    <span className="text-sm">건강 체크</span>
-                  </Button>
-                </Link>
-                <Link href="/report/medication">
-                  <Button className="w-full h-20 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-700 flex flex-col items-center justify-center">
-                    <Pill className="w-5 h-5 mb-1" />
-                    <span className="text-sm">약 복용 관리</span>
-                  </Button>
-                </Link>
-                <Link href="/report/vaccine">
-                  <Button className="w-full h-20 rounded-xl bg-green-100 hover:bg-green-200 text-green-700 flex flex-col items-center justify-center">
-                    <FileText className="w-5 h-5 mb-1" />
-                    <span className="text-sm">예방접종 기록</span>
-                  </Button>
-                </Link>
-                <Link href="/health-record?tab=weight">
-                  <Button className="w-full h-20 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 flex flex-col items-center justify-center">
-                    <Scale className="w-5 h-5 mb-1" />
-                    <span className="text-sm">체중 기록</span>
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 약 복용 알림 */}
-          {petInfo && petInfo.isActive && (
-            <Card className="bg-white rounded-xl shadow-sm">
-              <CardHeader className="pb-2">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-lg font-semibold text-gray-800">약 복용 알림</CardTitle>
-                  <LinkButton href="/report/medication" variant="outline" size="sm">
-                    모두 보기
-                  </LinkButton>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {medications.slice(0, 2).map((med: any) => (
-                    <div key={med.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Pill className="h-5 w-5 text-pink-500" />
-                        <div>
-                          <div className="font-medium">{med.name}</div>
-                          <div className="text-sm text-gray-600">{med.dosage}</div>
-                        </div>
-                      </div>
-                      <span className="text-sm font-medium">{med.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* 건강 기록 */}
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-semibold text-gray-800">건강 기록</CardTitle>
-                <LinkButton href="/health-record" variant="outline" size="sm">
-                  모두 보기
-                </LinkButton>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/health-record?tab=health">
-                  <Button
-                    variant="outline"
-                    className="w-full h-16 justify-start gap-3 border-gray-200"
-                  >
-                    <Stethoscope className="w-5 h-5 text-pink-500" />
-                    <div className="text-left">
-                      <div className="font-medium">건강 체크</div>
-                      <div className="text-xs text-gray-500">매일 체크하기</div>
-                    </div>
-                  </Button>
-                </Link>
-                <Link href="/health-record?tab=weight">
-                  <Button
-                    variant="outline"
-                    className="w-full h-16 justify-start gap-3 border-gray-200"
-                  >
-                    <Scale className="w-5 h-5 text-purple-500" />
-                    <div className="text-left">
-                      <div className="font-medium">체중 기록</div>
-                      <div className="text-xs text-gray-500">변화 추이 보기</div>
-                    </div>
-                  </Button>
-                </Link>
-                <Link href="/report/vaccine">
-                  <Button
-                    variant="outline"
-                    className="w-full h-16 justify-start gap-3 border-gray-200"
-                  >
-                    <Syringe className="w-5 h-5 text-green-500" />
-                    <div className="text-left">
-                      <div className="font-medium">예방접종</div>
-                      <div className="text-xs text-gray-500">접종 내역 확인</div>
-                    </div>
-                  </Button>
-                </Link>
-                <Link href="/report/medical">
-                  <Button
-                    variant="outline"
-                    className="w-full h-16 justify-start gap-3 border-gray-200"
-                  >
-                    <Clipboard className="w-5 h-5 text-blue-500" />
-                    <div className="text-left">
-                      <div className="font-medium">진료 기록</div>
-                      <div className="text-xs text-gray-500">병원 방문 기록</div>
-                    </div>
                   </Button>
                 </Link>
               </div>
@@ -288,7 +188,7 @@ export default function DashboardContent() {
   }
 
   // 로그인 상태에서 반려견 미등록 시
-  if (!petInfo) {
+  if (isLoggedIn && !petInfo) {
     return (
       <div className="min-h-screen bg-beige flex flex-col items-center justify-center p-6">
         <div className="text-center mb-8">

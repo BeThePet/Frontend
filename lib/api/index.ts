@@ -81,4 +81,33 @@ export const petApi = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+}
+
+// Health Check 관련 API 함수들
+export const healthCheckApi = {
+  getDailyCheck: (petId: string, date: string) => 
+    fetchApi(`/api/health/${petId}/daily?date=${date}`),
+  
+  createDailyCheck: (petId: string, data: HealthCheckFormData) => 
+    fetchApi(`/api/health/${petId}/daily`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  
+  getHealthHistory: (petId: string, startDate: string, endDate: string) =>
+    fetchApi(`/api/health/${petId}/history?startDate=${startDate}&endDate=${endDate}`),
+}
+
+// Walk Record 관련 API 함수들
+export const walkApi = {
+  createWalk: (petId: string, data: WalkFormData) => 
+    fetchApi(`/api/health/walks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        petId,
+        ...data,
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().split(' ')[0].slice(0, 5)
+      }),
+    }),
 } 

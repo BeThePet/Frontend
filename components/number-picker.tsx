@@ -15,7 +15,7 @@ interface NumberPickerProps {
 }
 
 export function NumberPicker({
-  value,
+  value: initialValue,
   onChange,
   min = 0,
   max = 100,
@@ -23,22 +23,24 @@ export function NumberPicker({
   unit = "",
   precision = 1,
 }: NumberPickerProps) {
-  const [currentValue, setCurrentValue] = useState(value)
+  // initialValue가 number 타입이 아닐 경우 기본값 사용
+  const [currentValue, setCurrentValue] = useState<number>(typeof initialValue === 'number' ? initialValue : 0)
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const pickerRef = useRef<HTMLDivElement>(null)
 
   // 값 변경 시 부모 컴포넌트에 알림
   useEffect(() => {
-    if (currentValue !== value) {
+    if (typeof initialValue === 'number' && currentValue !== initialValue) {
       onChange(currentValue)
     }
-  }, [currentValue, onChange, value])
+  }, [currentValue, onChange, initialValue])
 
   // 외부에서 값이 변경되면 내부 상태 업데이트
   useEffect(() => {
-    setCurrentValue(value)
-  }, [value])
+    if (typeof initialValue === 'number') {
+      setCurrentValue(initialValue)
+    }
+  }, [initialValue])
 
   // 숫자 배열 생성 (선택 가능한 값들)
   const generateNumbers = () => {
@@ -53,49 +55,46 @@ export function NumberPicker({
 
   // 값 증가
   const increment = () => {
-    if (currentValue + step <= max) {
-      setCurrentValue(Number((currentValue + step).toFixed(precision)))
+    const newValue = Number((currentValue + step).toFixed(precision))
+    if (newValue <= max) {
+      setCurrentValue(newValue)
     }
   }
 
   // 값 감소
   const decrement = () => {
-    if (currentValue - step >= min) {
-      setCurrentValue(Number((currentValue - step).toFixed(precision)))
+    const newValue = Number((currentValue - step).toFixed(precision))
+    if (newValue >= min) {
+      setCurrentValue(newValue)
     }
   }
 
-  // 피커 열기
+  // 드롭다운 열기
   const openPicker = () => {
     setIsOpen(true)
   }
 
-  // 피커 닫기
+  // 드롭다운 닫기
   const closePicker = () => {
     setIsOpen(false)
   }
 
-  // 값 선택
-  const selectValue = (val: number) => {
-    setCurrentValue(val)
-    closePicker()
-  }
-
-  // 외부 클릭 감지
+  // 외부 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         closePicker()
       }
     }
 
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside)
-    }
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside)
-    }
-  }, [isOpen])
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => document.removeEventListener("mousedown", handleClickOutside)
+  }, [])
+
+  // currentValue가 유효한 숫자인지 확인
+  const displayValue = typeof currentValue === 'number' && !isNaN(currentValue) 
+    ? currentValue.toFixed(precision === 0 ? 0 : precision)
+    : '0'
 
   return (
     <div className="relative" ref={containerRef}>
@@ -114,7 +113,7 @@ export function NumberPicker({
           onClick={openPicker}
         >
           <span className="text-lg font-medium text-gray-800">
-            {currentValue.toFixed(precision === 0 ? 0 : precision)}
+            {displayValue}
           </span>
           {unit && <span className="text-sm text-gray-500">{unit}</span>}
         </div>
@@ -132,29 +131,28 @@ export function NumberPicker({
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            ref={pickerRef}
-            className="absolute z-50 mt-2 bg-white rounded-lg shadow-lg border border-gray-200 max-h-[250px] overflow-auto w-full min-w-[120px] left-1/2 transform -translate-x-1/2"
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.2 }}
+            className="absolute z-10 mt-2 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-[200px] overflow-y-auto"
           >
-            <div className="p-1">
-              {numbers.map((num) => (
-                <div
-                  key={num}
-                  className={`px-3 py-2 rounded-md cursor-pointer transition-colors ${
-                    num === currentValue ? "bg-pink-100 text-pink-600 font-medium" : "hover:bg-gray-100"
-                  }`}
-                  onClick={() => selectValue(num)}
-                >
-                  <div className="flex items-center justify-between">
-                    <span>{num.toFixed(precision === 0 ? 0 : precision)}</span>
-                    {unit && <span className="text-sm text-gray-500">{unit}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
+            {numbers.map((num) => (
+              <button
+                key={num}
+                type="button"
+                className={`w-full px-4 py-2 text-left hover:bg-pink-50 transition-colors ${
+                  num === currentValue ? "bg-pink-100 text-pink-600" : "text-gray-700"
+                }`}
+                onClick={() => {
+                  setCurrentValue(num)
+                  closePicker()
+                }}
+              >
+                {num.toFixed(precision === 0 ? 0 : precision)}
+                {unit && <span className="ml-1 text-sm text-gray-500">{unit}</span>}
+              </button>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>

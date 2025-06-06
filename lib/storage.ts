@@ -53,66 +53,58 @@ export function saveData(key: string, data: any): boolean {
   return false
 }
 
+// 개발용 목데이터
+export const MOCK_PET_INFO = {
+  id: "pet-001",
+  name: "멍멍이",
+  breed: "말티즈",
+  birthDate: "2020-01-01",
+  gender: "female",
+  weight: 3.5,
+  imageUrl: "/images/pet-placeholder.png"
+}
+
 /**
- * 데이터 가져오기 함수
- *
- * 백엔드 연결 시 다음과 같은 API 호출로 대체:
- * - GET /api/pets/:petId/data/:dataType
- *
- * @param key 가져올 데이터의 키
+ * 로컬 스토리지에서 데이터를 가져옵니다.
+ * @param key 저장된 데이터의 키
  * @returns 저장된 데이터 또는 null
  */
-export function getData(key: string): any {
-  if (typeof window !== "undefined") {
-    try {
-      const data = localStorage.getItem(key)
-      return data ? JSON.parse(data) : null
-    } catch (error) {
-      console.error("Error getting data from localStorage:", error)
-      return null
+export function getData<T>(key: string): T | null {
+  try {
+    // 개발 환경에서 petInfo 요청 시 목데이터 반환
+    if (key === "petInfo") {
+      return MOCK_PET_INFO as T
     }
+    
+    const item = localStorage.getItem(key)
+    return item ? JSON.parse(item) : null
+  } catch (error) {
+    console.error("로컬 스토리지에서 데이터를 가져오는데 실패했습니다:", error)
+    return null
   }
-  return null
 }
 
 /**
- * 특정 키의 데이터 삭제 함수
- *
- * 백엔드 연결 시 다음과 같은 API 호출로 대체:
- * - DELETE /api/pets/:petId/data/:dataType
- *
+ * 로컬 스토리지에서 데이터를 삭제합니다.
  * @param key 삭제할 데이터의 키
  */
-export function removeData(key: string): boolean {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.removeItem(key)
-      return true
-    } catch (error) {
-      console.error("Error removing data from localStorage:", error)
-      return false
-    }
+export function removeData(key: string): void {
+  try {
+    localStorage.removeItem(key)
+  } catch (error) {
+    console.error("로컬 스토리지에서 데이터를 삭제하는데 실패했습니다:", error)
   }
-  return false
 }
 
 /**
- * 모든 데이터 삭제 함수
- *
- * 백엔드 연결 시 다음과 같은 API 호출로 대체:
- * - DELETE /api/pets/:petId/data
+ * 로컬 스토리지의 모든 데이터를 삭제합니다.
  */
-export function clearAllData(): boolean {
-  if (typeof window !== "undefined") {
-    try {
-      localStorage.clear()
-      return true
-    } catch (error) {
-      console.error("Error clearing all data from localStorage:", error)
-      return false
-    }
+export function clearAllData(): void {
+  try {
+    localStorage.clear()
+  } catch (error) {
+    console.error("로컬 스토리지를 초기화하는데 실패했습니다:", error)
   }
-  return false
 }
 
 /**
