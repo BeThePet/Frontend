@@ -17,6 +17,29 @@ export default function NotificationManager() {
   const [notifications, setNotifications] = useState<any[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
 
+  // 알림 목록 업데이트 함수
+  const updateNotifications = () => {
+    const scheduledNotifications = getScheduledNotifications()
+    const today = new Date()
+    const todayString = today.toDateString()
+    
+    // 오늘 날짜의 활성화된 알림만 필터링
+    const activeNotifications = scheduledNotifications.filter((n) => {
+      if (!n.isActive || n.triggered) return false
+      
+      // 약 관련 알림인지 확인
+      if (n.id.startsWith('medication-')) {
+        const notificationDate = new Date(n.scheduledTime).toDateString()
+        return notificationDate === todayString
+      }
+      
+      // 다른 종류의 알림은 그대로 표시
+      return true
+    })
+    
+    setNotifications(activeNotifications)
+  }
+
   useEffect(() => {
     // 클라이언트 사이드에서만 실행
     if (typeof window !== "undefined" && "Notification" in window) {
@@ -29,8 +52,12 @@ export default function NotificationManager() {
       }
 
       // 예약된 알림 목록 로드
-      const scheduledNotifications = getScheduledNotifications()
-      setNotifications(scheduledNotifications.filter((n) => n.isActive))
+      updateNotifications()
+
+      // 1초마다 알림 목록 업데이트
+      const interval = setInterval(updateNotifications, 1000)
+      
+      return () => clearInterval(interval)
     }
   }, [])
 
@@ -60,13 +87,29 @@ export default function NotificationManager() {
 
   // 알림 취소 처리
   const handleCancelNotification = (id: string) => {
-    cancelNotification(id)
-    setNotifications(notifications.filter((n) => n.id !== id))
+    try {
+      cancelNotification(id)
+      updateNotifications() // 목록 즉시 업데이트
+      toast({
+        title: "알림 취소됨",
+        description: "예정된 알림이 취소되었습니다.",
+      })
+    } catch (error) {
+      console.error("알림 취소 중 오류 발생:", error)
+      toast({
+        title: "알림 취소 실패",
+        description: "알림 취소 중 오류가 발생했습니다.",
+        variant: "destructive",
+      })
+    }
   }
 
   // 알림 목록 토글
   const toggleNotifications = () => {
     setShowNotifications(!showNotifications)
+    if (!showNotifications) {
+      updateNotifications() // 패널 열 때 최신 목록으로 업데이트
+    }
   }
 
   // 브라우저 지원 여부 확인
@@ -142,17 +185,17 @@ export default function NotificationManager() {
                 notifications.map((notification) => (
                   <div key={notification.id} className="p-3 border-b border-gray-100 last:border-0">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <h4 className="font-medium text-sm">{notification.title}</h4>
-                        <p className="text-xs text-gray-500">{notification.body}</p>
+                      <div className="flex-1 pr-2">
+                        <h4 className="font-medium text-sm">{notification.title || '알림'}</h4>
+                        <p className="text-xs text-gray-500">{notification.body || ''}</p>
                         <p className="text-xs text-gray-400 mt-1">
-                          {new Date(notification.scheduledTime).toLocaleString()}
+                          {notification.scheduledTime ? new Date(notification.scheduledTime).toLocaleString() : ''}
                         </p>
                       </div>
                       <Button
                         size="icon"
                         variant="ghost"
-                        className="h-6 w-6"
+                        className="h-6 w-6 flex-shrink-0"
                         onClick={() => handleCancelNotification(notification.id)}
                       >
                         <X className="h-4 w-4" />

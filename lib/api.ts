@@ -205,6 +205,82 @@ export interface HospitalCreateRequest {
   specialties: string[]
 }
 
+// Medication types
+export interface MedicationRequest {
+  name: string
+  time: string
+  weekdays: string
+  dosage: string
+  start_date: string
+  end_date?: string
+  memo?: string
+  alarm_enabled: boolean
+}
+
+export interface MedicationResponse {
+  id: number
+  name: string
+  time: string
+  weekdays: string
+  dosage: string
+  start_date: string
+  end_date?: string
+  memo?: string
+  alarm_enabled: boolean
+}
+
+// Mock medication data for development
+const generateTestTime = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() + 1) // 현재 시간 + 1분
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:00`
+}
+
+const mockMedications: MedicationResponse[] = [
+  {
+    id: 1,
+    name: "심장약",
+    time: "08:00:00",
+    weekdays: "월, 화, 수, 목, 금",
+    dosage: "1정",
+    start_date: "2024-01-01",
+    end_date: "2024-12-31",
+    memo: "아침 식사 후 복용",
+    alarm_enabled: true
+  },
+  {
+    id: 2,
+    name: "관절영양제",
+    time: "18:00:00",
+    weekdays: "월",
+    dosage: "2정",
+    start_date: "2024-01-15",
+    memo: "저녁 식사와 함께",
+    alarm_enabled: true
+  },
+  {
+    id: 3,
+    name: "소화제",
+    time: "12:00:00",
+    weekdays: "월, 수, 금",
+    dosage: "0.5정",
+    start_date: "2024-02-01",
+    end_date: "2024-03-01",
+    memo: "점심 식사 전 30분",
+    alarm_enabled: false
+  },
+  {
+    id: 4,
+    name: "테스트 알림약",
+    time: generateTestTime(),
+    weekdays: "월, 화, 수, 목, 금, 토, 일",
+    dosage: "1정",
+    start_date: new Date().toISOString().split('T')[0],
+    memo: "알림 테스트용 (1분 후 알림)",
+    alarm_enabled: true
+  }
+]
+
 // API functions (currently using mock data)
 export const emergencyApi = {
   // Get emergency guides list
@@ -297,6 +373,67 @@ export const emergencyApi = {
     const index = mockAllHospitals.findIndex(h => h.id === hospitalId)
     if (index !== -1) {
       mockAllHospitals.splice(index, 1)
+    }
+  }
+}
+
+// Medication API functions
+export const medicationApi = {
+  // Get all medications
+  getMedications: async (): Promise<MedicationResponse[]> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return [...mockMedications]
+  },
+
+  // Create medication (POST only for creation)
+  createMedication: async (medicationData: MedicationRequest): Promise<MedicationResponse> => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // 종료일이 없으면 필드 제거
+    const requestData: any = { ...medicationData }
+    if (!requestData.end_date) {
+      delete requestData.end_date
+    }
+    
+    const newMedication: MedicationResponse = {
+      ...requestData,
+      id: Date.now(), // Mock ID generation
+      end_date: requestData.end_date || undefined
+    }
+    mockMedications.push(newMedication)
+    return newMedication
+  },
+
+  // Update medication (PUT for updates)
+  updateMedication: async (medicationId: number, medicationData: MedicationRequest): Promise<MedicationResponse> => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    const index = mockMedications.findIndex(m => m.id === medicationId)
+    if (index === -1) {
+      throw new Error('Medication not found')
+    }
+    
+    // 종료일이 없으면 필드 제거
+    const requestData: any = { ...medicationData }
+    if (!requestData.end_date) {
+      delete requestData.end_date
+    }
+    
+    const updatedMedication: MedicationResponse = {
+      ...requestData,
+      id: medicationId,
+      end_date: requestData.end_date || undefined
+    }
+    
+    mockMedications[index] = updatedMedication
+    return updatedMedication
+  },
+
+  // Delete medication
+  deleteMedication: async (medicationId: number): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    const index = mockMedications.findIndex(m => m.id === medicationId)
+    if (index !== -1) {
+      mockMedications.splice(index, 1)
     }
   }
 } 

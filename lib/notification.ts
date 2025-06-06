@@ -60,9 +60,15 @@ export function scheduleNotification(id: string, title: string, body: string, sc
     return
   }
 
+  // 기존 동일한 ID의 알림이 있으면 먼저 취소
+  cancelNotification(id)
+
   // 알림 데이터 저장
   const notifications = getScheduledNotifications()
-  notifications.push({
+  // 중복 제거를 위해 같은 ID가 있으면 제거
+  const filteredNotifications = notifications.filter(n => n.id !== id)
+  
+  filteredNotifications.push({
     id,
     title,
     body,
@@ -71,7 +77,7 @@ export function scheduleNotification(id: string, title: string, body: string, sc
     isActive: true,
   })
 
-  saveScheduledNotifications(notifications)
+  saveScheduledNotifications(filteredNotifications)
 
   // 현재 세션에서 타이머 설정
   setTimeout(() => {
