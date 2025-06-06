@@ -212,7 +212,7 @@ export interface MedicationRequest {
   weekdays: string
   dosage: string
   start_date: string
-  end_date?: string
+  end_date?: string | null
   memo?: string
   alarm_enabled: boolean
 }
@@ -224,7 +224,7 @@ export interface MedicationResponse {
   weekdays: string
   dosage: string
   start_date: string
-  end_date?: string
+  end_date?: string | null
   memo?: string
   alarm_enabled: boolean
 }
@@ -389,9 +389,9 @@ export const medicationApi = {
   createMedication: async (medicationData: MedicationRequest): Promise<MedicationResponse> => {
     await new Promise(resolve => setTimeout(resolve, 500))
     
-    // 종료일이 없으면 필드 제거
+    // 종료일이 없거나 null이면 필드 제거
     const requestData: any = { ...medicationData }
-    if (!requestData.end_date) {
+    if (!requestData.end_date || requestData.end_date === null) {
       delete requestData.end_date
     }
     
@@ -412,9 +412,9 @@ export const medicationApi = {
       throw new Error('Medication not found')
     }
     
-    // 종료일이 없으면 필드 제거
+    // 종료일이 없거나 null이면 필드 제거
     const requestData: any = { ...medicationData }
-    if (!requestData.end_date) {
+    if (!requestData.end_date || requestData.end_date === null) {
       delete requestData.end_date
     }
     

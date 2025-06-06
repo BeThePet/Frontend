@@ -173,12 +173,32 @@ export default function MedicationContent() {
       return
     }
 
+    // 종료일이 시작일보다 이전인지 검증
+    if (newMedication.end_date && newMedication.end_date < newMedication.start_date) {
+      toast({
+        title: "종료일 오류",
+        description: "종료일은 시작일보다 이후여야 합니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // 시작일이 종료일보다 이후인지 검증
+    if (newMedication.end_date && newMedication.start_date > newMedication.end_date) {
+      toast({
+        title: "시작일 오류",
+        description: "시작일은 종료일보다 이전이어야 합니다.",
+        variant: "destructive",
+      })
+      return
+    }
+
     try {
       setIsLoading(true)
       
-      // 종료일이 비어있으면 제거
+      // 종료일이 비어있거나 null이면 제거
       const requestData = { ...newMedication }
-      if (!requestData.end_date) {
+      if (!requestData.end_date || requestData.end_date === null) {
         delete (requestData as any).end_date
       }
       
@@ -287,8 +307,8 @@ export default function MedicationContent() {
         memo: medication.memo || "",
       }
 
-      // 종료일이 비어있으면 제거
-      if (!updatedMedication.end_date) {
+      // 종료일이 비어있거나 null이면 제거
+      if (!updatedMedication.end_date || updatedMedication.end_date === null) {
         delete (updatedMedication as any).end_date
       }
 
@@ -559,6 +579,7 @@ export default function MedicationContent() {
                   id="start_date"
                   type="date"
                   value={newMedication.start_date}
+                  max={newMedication.end_date || undefined}
                   onChange={(e) => handleInputChange("start_date", e.target.value)}
                 />
               </div>
@@ -567,7 +588,8 @@ export default function MedicationContent() {
                 <Input
                   id="end_date"
                   type="date"
-                  value={newMedication.end_date}
+                  value={newMedication.end_date || ""}
+                  min={newMedication.start_date}
                   onChange={(e) => handleInputChange("end_date", e.target.value)}
                 />
               </div>
@@ -576,7 +598,7 @@ export default function MedicationContent() {
               <Label htmlFor="memo">메모 (선택)</Label>
               <Input
                 id="memo"
-                value={newMedication.memo}
+                value={newMedication.memo || ""}
                 onChange={(e) => handleInputChange("memo", e.target.value)}
                 placeholder="추가 정보를 입력하세요"
               />
