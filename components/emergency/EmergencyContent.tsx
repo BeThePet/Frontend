@@ -26,13 +26,13 @@ export default function EmergencyContent() {
         setIsLoading(true)
         setIsLoadingGuides(true)
         
-        // 병원 요약 정보와 응급 가이드를 동시에 불러오기
-        const [hospitalsSummary, guides] = await Promise.all([
-          emergencyApi.getHospitalsSummary(),
+        // 응급 병원 요약 정보와 응급 가이드를 동시에 불러오기
+        const [emergencyHospitalsSummary, guides] = await Promise.all([
+          emergencyApi.getEmergencyHospitalsSummary(), // 업데이트된 API 함수 사용
           emergencyApi.getGuides()
         ])
         
-        setEmergencyHospitals(hospitalsSummary)
+        setEmergencyHospitals(emergencyHospitalsSummary)
         setEmergencyGuides(guides)
       } catch (error) {
         console.error("데이터를 불러오는 중 오류가 발생했습니다:", error)
@@ -138,7 +138,7 @@ export default function EmergencyContent() {
               </div>
             </div>
 
-            {/* 등록된 응급 병원 정보 표시 */}
+            {/* 등록된 응급 병원 정보 표시 (is_emergency: true인 병원만) */}
             {isLoading ? (
               <div className="mt-4 border-t border-gray-100 pt-4">
                 <div className="flex justify-center">
@@ -147,7 +147,7 @@ export default function EmergencyContent() {
               </div>
             ) : emergencyHospitals.length > 0 ? (
               <div className="mt-4 border-t border-gray-100 pt-4">
-                <h3 className="font-medium text-gray-800 mb-2">등록된 응급 병원</h3>
+                <h3 className="font-medium text-gray-800 mb-2">24시간 응급 병원</h3>
                 <div className="space-y-2">
                   {emergencyHospitals.map((hospital) => (
                     <div key={hospital.id} className="flex justify-between items-center p-2 bg-red-50 rounded-lg">

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
 import { motion } from "framer-motion"
 import { emergencyApi, type HospitalDetail, type HospitalCreateRequest } from "@/lib/api"
@@ -34,12 +35,31 @@ export default function HospitalContent() {
   const [specialties, setSpecialties] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>("all")
 
-  // 병원 정보 불러오기
+  // 병원 정보 불러오기 (탭에 따라 다른 API 호출)
   useEffect(() => {
     const loadData = async () => {
       try {
         setIsLoading(true)
-        const hospitalData = await emergencyApi.getAllHospitalDetails()
+        let hospitalData: HospitalDetail[] = []
+        
+        // 탭에 따라 다른 엔드포인트 호출
+        switch (activeTab) {
+          case "all":
+            hospitalData = await emergencyApi.getAllHospitals()
+            break
+          case "emergency":
+            hospitalData = await emergencyApi.getEmergencyHospitals()
+            break
+          case "regular":
+            hospitalData = await emergencyApi.getRegularHospitals()
+            break
+          case "specialist":
+            hospitalData = await emergencyApi.getSpecialistHospitals()
+            break
+          default:
+            hospitalData = await emergencyApi.getAllHospitals()
+        }
+        
         setHospitals(hospitalData)
       } catch (error) {
         console.error("병원 정보를 불러오는 중 오류가 발생했습니다:", error)
@@ -54,7 +74,7 @@ export default function HospitalContent() {
     }
 
     loadData()
-  }, [toast])
+  }, [activeTab, toast])
 
   // 병원 추가 또는 수정
   const handleSaveHospital = async () => {
@@ -84,6 +104,7 @@ export default function HospitalContent() {
       if (editingHospital) {
         // 병원 정보 수정
         const updatedHospital = await emergencyApi.updateHospital(editingHospital.id, hospitalData)
+        // 수정 후 현재 탭에 맞는 데이터를 다시 로드
         const updatedHospitals = hospitals.map((hospital) =>
           hospital.id === editingHospital.id ? updatedHospital : hospital
         )
@@ -166,15 +187,6 @@ export default function HospitalContent() {
     }
   }
 
-  // 필터링된 병원 목록
-  const filteredHospitals = hospitals.filter((hospital) => {
-    if (activeTab === "all") return true
-    if (activeTab === "emergency") return hospital.is_emergency
-    if (activeTab === "regular") return hospital.type === "일반 병원"
-    if (activeTab === "specialist") return hospital.type === "전문 병원"
-    return true
-  })
-
   return (
     <div className="min-h-screen bg-beige pb-20">
       <div className="bg-pink-light p-4 flex items-center justify-between">
@@ -185,7 +197,7 @@ export default function HospitalContent() {
           <h1 className="text-xl font-bold text-gray-800 ml-4">병원 정보 관리</h1>
         </div>
         {!showAddForm && (
-          <Button className="bg-pink-DEFAULT hover:bg-pink-dark text-white" onClick={() => setShowAddForm(true)}>
+          <Button className="bg-pink-500 hover:bg-pink-600 text-white" onClick={() => setShowAddForm(true)}>
             <Plus className="w-4 h-4 mr-1" /> 병원 추가
           </Button>
         )}
@@ -261,16 +273,17 @@ export default function HospitalContent() {
                     </RadioGroup>
                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="isEmergency"
+                  {/* 24시간 응급 진료 가능 스위치 */}
+                  <div className="flex items-center justify-between space-x-2 p-3 bg-gray-50 rounded-lg">
+                    <Label htmlFor="isEmergencySwitch" className="text-sm font-medium">
+                      24시간 응급 진료 가능
+                    </Label>
+                    <Switch
+                      id="isEmergencySwitch"
                       checked={isEmergency}
-                      onChange={(e) => setIsEmergency(e.target.checked)}
-                      className="rounded border-gray-300"
+                      onCheckedChange={setIsEmergency}
                       disabled={isSubmitting}
                     />
-                    <Label htmlFor="isEmergency">24시간 응급 진료 가능</Label>
                   </div>
 
                   <div className="space-y-2">
@@ -293,7 +306,11 @@ export default function HospitalContent() {
                           <Badge
                             key={specialty}
                             variant={specialties.includes(specialty) ? "default" : "outline"}
-                            className={`cursor-pointer ${specialties.includes(specialty) ? "bg-pink-DEFAULT" : ""} ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                            className={`cursor-pointer transition-colors ${
+                              specialties.includes(specialty) 
+                                ? "bg-pink-500 hover:bg-pink-600 text-white border-pink-500" 
+                                : "hover:bg-pink-100 text-gray-700"
+                            } ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
                             onClick={() => !isSubmitting && toggleSpecialty(specialty)}
                           >
                             {specialty}
@@ -321,7 +338,7 @@ export default function HospitalContent() {
                     취소
                   </Button>
                   <Button 
-                    className="flex-1 bg-pink-DEFAULT hover:bg-pink-dark text-white" 
+                    className="flex-1 bg-pink-500 hover:bg-pink-600 text-white" 
                     onClick={handleSaveHospital}
                     disabled={isSubmitting}
                   >
@@ -361,8 +378,8 @@ export default function HospitalContent() {
                   <div className="flex justify-center items-center py-10">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500"></div>
                   </div>
-                ) : filteredHospitals.length > 0 ? (
-                  filteredHospitals.map((hospital) => (
+                ) : hospitals.length > 0 ? (
+                  hospitals.map((hospital) => (
                     <motion.div
                       key={hospital.id}
                       initial={{ opacity: 0, y: 10 }}
@@ -455,7 +472,7 @@ export default function HospitalContent() {
                     <AlertTriangle className="w-12 h-12 mx-auto text-gray-400 mb-2" />
                     <p className="text-gray-500">등록된 병원이 없습니다</p>
                     <Button
-                      className="mt-4 bg-pink-DEFAULT hover:bg-pink-dark text-white"
+                      className="mt-4 bg-pink-500 hover:bg-pink-600 text-white"
                       onClick={() => setShowAddForm(true)}
                     >
                       <Plus className="w-4 h-4 mr-1" /> 병원 추가하기
@@ -465,7 +482,7 @@ export default function HospitalContent() {
               </TabsContent>
             </Tabs>
 
-            {filteredHospitals.length > 0 && (
+            {hospitals.length > 0 && (
               <div className="mt-4 bg-pink-50 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Heart className="w-5 h-5 text-pink-500" />

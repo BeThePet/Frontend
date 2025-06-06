@@ -118,25 +118,8 @@ const mockEmergencyGuides = [
   }
 ]
 
-const mockHospitalsSummary = [
-  {
-    "id": 1,
-    "name": "24시 동물메디컬센터",
-    "phone": "02-1234-5678"
-  },
-  {
-    "id": 2,
-    "name": "우리동네 동물병원",
-    "phone": "02-9876-5432"
-  },
-  {
-    "id": 3,
-    "name": "특수동물 전문센터",
-    "phone": "02-5555-1234"
-  }
-]
-
-const mockHospitalDetails = [
+// Mock hospital data - separated by type for new endpoints
+const mockAllHospitals = [
   {
     "id": 1,
     "name": "24시 동물메디컬센터",
@@ -169,6 +152,17 @@ const mockHospitalDetails = [
     "hours": "평일 10:00-19:00",
     "notes": "특수동물 및 야생동물 전문",
     "specialties": ["특수동물", "야생동물", "이국적 동물"]
+  },
+  {
+    "id": 4,
+    "name": "응급 동물병원 365",
+    "phone": "02-7777-8888",
+    "address": "서울시 마포구 월드컵로 111",
+    "type": "응급 병원",
+    "is_emergency": true,
+    "hours": "24시간 운영",
+    "notes": "365일 24시간 응급진료",
+    "specialties": ["응급 처치", "응급 수술", "중환자실"]
   }
 ]
 
@@ -227,16 +221,45 @@ export const emergencyApi = {
     return guide || null
   },
 
-  // Get hospitals summary
-  getHospitalsSummary: async (): Promise<HospitalSummary[]> => {
+  // Get emergency hospitals summary (only is_emergency: true)
+  getEmergencyHospitalsSummary: async (): Promise<HospitalSummary[]> => {
     await new Promise(resolve => setTimeout(resolve, 400))
-    return mockHospitalsSummary
+    const emergencyHospitals = mockAllHospitals.filter(h => h.is_emergency === true)
+    return emergencyHospitals.map(h => ({
+      id: h.id,
+      name: h.name,
+      phone: h.phone
+    }))
+  },
+
+  // Get all hospitals
+  getAllHospitals: async (): Promise<HospitalDetail[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400))
+    return [...mockAllHospitals]
+  },
+
+  // Get regular hospitals
+  getRegularHospitals: async (): Promise<HospitalDetail[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400))
+    return mockAllHospitals.filter(h => h.type === "일반 병원")
+  },
+
+  // Get emergency hospitals  
+  getEmergencyHospitals: async (): Promise<HospitalDetail[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400))
+    return mockAllHospitals.filter(h => h.type === "응급 병원")
+  },
+
+  // Get specialist hospitals
+  getSpecialistHospitals: async (): Promise<HospitalDetail[]> => {
+    await new Promise(resolve => setTimeout(resolve, 400))
+    return mockAllHospitals.filter(h => h.type === "전문 병원")
   },
 
   // Get hospital detail by ID
   getHospitalDetail: async (hospitalId: number): Promise<HospitalDetail | null> => {
     await new Promise(resolve => setTimeout(resolve, 300))
-    const hospital = mockHospitalDetails.find(h => h.id === hospitalId)
+    const hospital = mockAllHospitals.find(h => h.id === hospitalId)
     return hospital || null
   },
 
@@ -247,19 +270,14 @@ export const emergencyApi = {
       ...hospitalData,
       id: Date.now() // Mock ID generation
     }
-    mockHospitalDetails.push(newHospital)
-    mockHospitalsSummary.push({
-      id: newHospital.id,
-      name: newHospital.name,
-      phone: newHospital.phone
-    })
+    mockAllHospitals.push(newHospital)
     return newHospital
   },
 
   // Update hospital
   updateHospital: async (hospitalId: number, hospitalData: HospitalCreateRequest): Promise<HospitalDetail> => {
     await new Promise(resolve => setTimeout(resolve, 500))
-    const index = mockHospitalDetails.findIndex(h => h.id === hospitalId)
+    const index = mockAllHospitals.findIndex(h => h.id === hospitalId)
     if (index === -1) {
       throw new Error('Hospital not found')
     }
@@ -269,37 +287,16 @@ export const emergencyApi = {
       id: hospitalId
     }
     
-    mockHospitalDetails[index] = updatedHospital
-    
-    const summaryIndex = mockHospitalsSummary.findIndex(h => h.id === hospitalId)
-    if (summaryIndex !== -1) {
-      mockHospitalsSummary[summaryIndex] = {
-        id: hospitalId,
-        name: updatedHospital.name,
-        phone: updatedHospital.phone
-      }
-    }
-    
+    mockAllHospitals[index] = updatedHospital
     return updatedHospital
   },
 
   // Delete hospital
   deleteHospital: async (hospitalId: number): Promise<void> => {
     await new Promise(resolve => setTimeout(resolve, 300))
-    const detailIndex = mockHospitalDetails.findIndex(h => h.id === hospitalId)
-    const summaryIndex = mockHospitalsSummary.findIndex(h => h.id === hospitalId)
-    
-    if (detailIndex !== -1) {
-      mockHospitalDetails.splice(detailIndex, 1)
+    const index = mockAllHospitals.findIndex(h => h.id === hospitalId)
+    if (index !== -1) {
+      mockAllHospitals.splice(index, 1)
     }
-    if (summaryIndex !== -1) {
-      mockHospitalsSummary.splice(summaryIndex, 1)
-    }
-  },
-
-  // Get all hospital details (for local use)
-  getAllHospitalDetails: async (): Promise<HospitalDetail[]> => {
-    await new Promise(resolve => setTimeout(resolve, 400))
-    return [...mockHospitalDetails]
   }
 } 
