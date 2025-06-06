@@ -229,6 +229,16 @@ export interface MedicationResponse {
   alarm_enabled: boolean
 }
 
+// MBTI Types
+export interface MbtiRequest {
+  mbti_type: string
+}
+
+export interface MbtiResponse {
+  mbti_type: string
+  created_at: string
+}
+
 // Mock medication data for development
 const generateTestTime = () => {
   const now = new Date()
@@ -436,4 +446,56 @@ export const medicationApi = {
       mockMedications.splice(index, 1)
     }
   }
-} 
+}
+
+// MBTI API functions
+export const mbtiApi = {
+  // Save MBTI result (POST)
+  saveMbtiResult: async (mbtiData: MbtiRequest): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 실제 백엔드 연결 시 사용할 코드
+    // const response = await fetch('/mbti/', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //   },
+    //   body: JSON.stringify(mbtiData),
+    // })
+    
+    // if (response.status !== 204) {
+    //   throw new Error('Failed to save MBTI result')
+    // }
+    
+    // Mock: 콘솔에 저장된 결과 출력
+    console.log('MBTI 결과 저장됨:', mbtiData)
+  },
+
+  // Get latest MBTI result (GET)
+  getLatestMbtiResult: async (): Promise<MbtiResponse | null> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 실제 백엔드 연결 시 사용할 코드
+    // const response = await fetch('/mbti/', {
+    //   method: 'GET',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //   },
+    // })
+    
+    // if (!response.ok) {
+    //   if (response.status === 404) {
+    //     return null // 아직 MBTI 결과가 없음
+    //   }
+    //   throw new Error('Failed to fetch MBTI result')
+    // }
+    
+    // return response.json()
+    
+    // Mock: 테스트용 데이터 반환
+    return {
+      mbti_type: "ENFP",
+      created_at: new Date().toISOString()
+    }
+  }
+}

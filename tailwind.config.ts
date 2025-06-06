@@ -66,6 +66,11 @@ const config = {
           DEFAULT: "#0066CC",
           dark: "#004499",
         },
+        lavender: {
+          light: "#F3E8FF",
+          DEFAULT: "#DDD6FE",
+          dark: "#A855F7",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

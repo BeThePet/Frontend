@@ -6,12 +6,12 @@ import dynamic from 'next/dynamic'
 const MBTITestContent = dynamic(() => import('@/components/mbti/MBTITestContent'), {
   ssr: false,
   loading: () => (
-    <div className="min-h-screen bg-beige flex justify-center items-center">
+    <div className="min-h-screen bg-[#FFE4E1] flex justify-center items-center">
       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
     </div>
   )
 })
 
-export default function MBTITestPage() {
+export default function MbtiTestPage() {
   return <MBTITestContent />
 }

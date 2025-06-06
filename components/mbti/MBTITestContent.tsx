@@ -1,145 +1,195 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { ArrowLeft } from "lucide-react"
-import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { getData, saveData } from "@/lib/storage"
+import { ArrowLeft } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { motion } from "framer-motion"
+import { mbtiApi } from "@/lib/api"
 
+// MBTI 질문 데이터
 const questions = [
   {
-    id: 1,
-    text: "반려견이 새로운 사람을 만났을 때 주로 보이는 반응은?",
-    options: [
-      { text: "적극적으로 다가가 인사하고 관심을 보인다", type: "E" },
-      { text: "처음에는 조심스럽게 관찰하다가 천천히 다가간다", type: "I" },
+    category: "E/I",
+    questions: [
+      "낯선 사람에게 먼저 다가간다.",
+      "집에 손님이 오면 반가워서 흥분한다.",
+      "산책 중 다른 강아지를 보면 반응한다.",
+      "외출을 자주 하고 싶어한다.",
+      "주인이 없을 때 외로움을 많이 느낀다.",
     ],
   },
   {
-    id: 2,
-    text: "반려견이 새로운 장난감을 받았을 때의 모습은?",
-    options: [
-      { text: "즉시 가지고 놀면서 장난감의 용도를 파악한다", type: "S" },
-      { text: "장난감을 이리저리 관찰하고 새로운 방식으로 가지고 논다", type: "N" },
+    category: "S/N",
+    questions: [
+      "낯선 장소에서 긴장하거나 행동이 느려진다.",
+      "기존에 사용하던 장난감을 고집한다.",
+      "규칙적으로 산책하던 루트가 아니면 혼란스러워한다.",
+      "시끄러운 환경에서 빠르게 반응한다.",
+      "새로운 상황에서도 빠르게 적응한다.",
     ],
   },
   {
-    id: 3,
-    text: "반려견이 다른 강아지와 문제가 생겼을 때 주로 보이는 반응은?",
-    options: [
-      { text: "직접적으로 감정을 표현하고 즉각 대응한다", type: "T" },
-      { text: "상황을 피하거나 보호자에게 의지하려 한다", type: "F" },
+    category: "T/F",
+    questions: [
+      "보호자의 표정이나 말투에 따라 행동이 달라진다.",
+      "'앉아', '기다려' 등 명령어에 정확히 반응한다.",
+      "다른 강아지가 혼나는 걸 보면 불안해한다.",
+      "칭찬받았을 때 행동이 눈에 띄게 좋아진다.",
+      "논리적인 훈련보다 감정 표현에 더 반응한다.",
     ],
   },
   {
-    id: 4,
-    text: "반려견의 일상적인 생활 패턴은 어떤가요?",
-    options: [
-      { text: "정해진 시간에 맞춰 규칙적으로 행동한다", type: "J" },
-      { text: "그때그때 상황에 따라 유연하게 행동한다", type: "P" },
+    category: "J/P",
+    questions: [
+      "매일 정해진 시간에 식사를 원한다.",
+      "사료를 잘못 주면 예민하게 반응한다.",
+      "산책 루트가 바뀌면 스트레스를 느낀다.",
+      "스스로 새로운 놀이를 만들어 낸다.",
+      "집안의 새로운 환경에 쉽게 적응한다.",
     ],
   },
 ]
 
+// MBTI 결과를 백엔드에 저장하는 함수
+const saveMbtiResult = async (mbtiType: string) => {
+  try {
+    await mbtiApi.saveMbtiResult({ mbti_type: mbtiType })
+    console.log('MBTI 결과가 성공적으로 저장되었습니다.')
+  } catch (error) {
+    console.error('MBTI 결과 저장 중 오류가 발생했습니다:', error)
+  }
+}
+
 export default function MBTITestContent() {
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
+  const [currentCategory, setCurrentCategory] = useState(0)
   const [currentQuestion, setCurrentQuestion] = useState(0)
-  const [answers, setAnswers] = useState<string[]>([])
-  const [petInfo, setPetInfo] = useState<any>(null)
+  const [answers, setAnswers] = useState<Record<string, number[]>>({
+    "E/I": Array(5).fill(3), // 기본값 3 (보통이다)
+    "S/N": Array(5).fill(3),
+    "T/F": Array(5).fill(3),
+    "J/P": Array(5).fill(3),
+  })
 
-  useEffect(() => {
-    setMounted(true)
-    const savedPetInfo = getData("petInfo")
-    if (savedPetInfo) {
-      setPetInfo(savedPetInfo)
-    }
-  }, [])
+  const currentCategoryData = questions[currentCategory]
+  const questionText = currentCategoryData?.questions?.[currentQuestion]
+  const progress = ((currentCategory * 5 + currentQuestion + 1) / 20) * 100
 
-  if (!mounted) return null
-
-  const handleAnswer = (type: string) => {
-    const newAnswers = [...answers, type]
+  const handleAnswer = async (score: number) => {
+    const category = currentCategoryData.category
+    const newAnswers = { ...answers }
+    newAnswers[category][currentQuestion] = score
     setAnswers(newAnswers)
 
-    if (currentQuestion < questions.length - 1) {
+    // 다음 질문으로 이동
+    if (currentQuestion < 4) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
-      // 결과 계산
-      const types = ["E/I", "S/N", "T/F", "J/P"]
-      const result = types.map((type, index) => {
-        const [first, second] = type.split("/")
-        const firstCount = newAnswers.filter((answer, i) => i % 4 === index && answer === first).length
-        const secondCount = newAnswers.filter((answer, i) => i % 4 === index && answer === second).length
-        return firstCount >= secondCount ? first : second
-      })
-      const mbtiResult = result.join("")
-
-      // 결과 저장
-      if (petInfo) {
-        const updatedPetInfo = { ...petInfo, mbti: mbtiResult }
-        saveData("petInfo", updatedPetInfo)
-        setPetInfo(updatedPetInfo)
+      // 다음 카테고리로 이동
+      if (currentCategory < 3) {
+        setCurrentCategory(currentCategory + 1)
+        setCurrentQuestion(0)
+      } else {
+        // 테스트 완료, 결과 계산 후 백엔드에 저장
+        const result = calculateMbti(newAnswers)
+        await saveMbtiResult(result)
+        router.push(`/mbti/result?type=${result}`)
       }
-
-      // 결과 페이지로 이동
-      router.push(`/mbti/result?type=${mbtiResult}`)
     }
   }
 
+  const calculateMbti = (answers: Record<string, number[]>) => {
+    // E/I 계산 (높은 점수가 E 성향)
+    const eScore = answers["E/I"].reduce((sum, score) => sum + score, 0)
+    const firstLetter = eScore > 15 ? "E" : "I" // 중간값 15 (5문항 × 3점)
+
+    // S/N 계산 (높은 점수가 S 성향)
+    const sScore = answers["S/N"].reduce((sum, score) => sum + score, 0)
+    const secondLetter = sScore > 15 ? "S" : "N"
+
+    // T/F 계산 (높은 점수가 F 성향)
+    const fScore = answers["T/F"].reduce((sum, score) => sum + score, 0)
+    const thirdLetter = fScore > 15 ? "F" : "T"
+
+    // J/P 계산 (높은 점수가 J 성향)
+    const jScore = answers["J/P"].reduce((sum, score) => sum + score, 0)
+    const fourthLetter = jScore > 15 ? "J" : "P"
+
+    return `${firstLetter}${secondLetter}${thirdLetter}${fourthLetter}`
+  }
+
   return (
-    <div className="min-h-screen bg-beige pb-20">
-      <div className="bg-pink-200 p-4 flex items-center">
+    <div className="min-h-screen bg-[#FFE4E1]">
+      <div className="bg-white p-6 flex items-center shadow-md rounded-b-3xl">
         <Link href="/mbti" className="text-gray-800">
           <ArrowLeft className="w-6 h-6" />
         </Link>
-        <h1 className="text-xl font-bold text-gray-800 ml-4">반려견 MBTI 테스트</h1>
+        <h1 className="text-2xl font-extrabold text-gray-800 ml-4">반려견 MBTI 테스트</h1>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="p-5"
-      >
-        <Card className="bg-white rounded-xl shadow-sm mb-6">
-          <CardContent className="p-6">
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {petInfo?.name ? `${petInfo.name}의 ` : ""}성격 유형 테스트
-                </h2>
-                <span className="text-sm text-gray-500">
-                  {currentQuestion + 1} / {questions.length}
-                </span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-pink-500 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
-                />
-              </div>
-            </div>
+      <div className="p-6 space-y-6">
+        {/* 진행 상황 */}
+        <div className="space-y-2">
+          <div className="w-full bg-white rounded-full h-3 shadow-inner overflow-hidden">
+            <div
+              className="bg-gradient-to-r from-pink-300 to-pink-500 h-3 rounded-full transition-all duration-300"
+              style={{ width: `${progress}%` }}
+            ></div>
+          </div>
+          <p className="text-sm font-bold text-gray-700 text-right">{currentCategory * 5 + currentQuestion + 1}/20</p>
+        </div>
 
-            <h3 className="text-lg font-medium text-gray-800 mb-6">{questions[currentQuestion].text}</h3>
+        {/* 질문 카드 */}
+        <motion.div
+          key={`${currentCategory}-${currentQuestion}`}
+          initial={{ opacity: 0, x: 50 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -50 }}
+          transition={{ duration: 0.3 }}
+        >
+          <Card className="shadow-app">
+            <CardContent className="p-6">
+              <h2 className="text-xl font-bold text-gray-800 mb-8 text-center leading-relaxed">{questionText}</h2>
 
-            <div className="space-y-3">
-              {questions[currentQuestion].options.map((option, index) => (
+              <div className="flex flex-col gap-4">
                 <Button
-                  key={index}
-                  className="w-full h-auto py-4 px-6 bg-pink-50 hover:bg-pink-100 text-pink-700"
-                  onClick={() => handleAnswer(option.type)}
+                  onClick={() => handleAnswer(5)}
+                  className="w-full py-4 rounded-2xl bg-pink-500 hover:bg-pink-600 text-white font-bold text-lg"
                 >
-                  {option.text}
+                  매우 그렇다
                 </Button>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </motion.div>
+                <Button
+                  onClick={() => handleAnswer(4)}
+                  className="w-full py-4 rounded-2xl bg-pink-400 hover:bg-pink-500 text-white font-bold text-lg"
+                >
+                  그렇다
+                </Button>
+                <Button
+                  onClick={() => handleAnswer(3)}
+                  className="w-full py-4 rounded-2xl bg-pink-300 hover:bg-pink-400 text-white font-bold text-lg"
+                >
+                  보통이다
+                </Button>
+                <Button
+                  onClick={() => handleAnswer(2)}
+                  className="w-full py-4 rounded-2xl bg-pink-200 hover:bg-pink-300 text-gray-700 font-bold text-lg"
+                >
+                  아니다
+                </Button>
+                <Button
+                  onClick={() => handleAnswer(1)}
+                  className="w-full py-4 rounded-2xl bg-pink-100 hover:bg-pink-200 text-gray-700 font-bold text-lg"
+                >
+                  전혀 아니다
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      </div>
     </div>
   )
 } 

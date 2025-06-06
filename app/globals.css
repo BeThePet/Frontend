@@ -178,6 +178,19 @@ button {
   background-color: #eaffd6;
 }
 
+/* MBTI 관련 그라디언트 클래스 */
+.bg-gradient-warm {
+  background: linear-gradient(135deg, #FFE4E1, #FFB6C1);
+}
+
+.bg-gradient-cool {
+  background: linear-gradient(135deg, #E6F3FF, #DDD6FE);
+}
+
+.bg-gradient-pastel {
+  background: linear-gradient(135deg, #F3E8FF, #FFE4E1);
+}
+
 /* 버튼 스타일 */
 .btn-rounded {
   @apply rounded-full shadow-md transition-all duration-300 active:scale-95 font-bold border-2;
