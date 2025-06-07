@@ -6,71 +6,117 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { ArrowLeft, Plus, Check } from "lucide-react"
 import { motion } from "framer-motion"
-import { saveData, getData } from "@/lib/storage"
 import { useToast } from "@/hooks/use-toast"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import PhotoUpload from "@/components/photo-upload"
-import { allergyCategories } from "@/data/allergyCategories"
-import { diseaseCategories } from "@/data/diseaseCategories"
+import { 
+  dogApi, 
+  type BreedOption, 
+  type AllergyCategory, 
+  type DiseaseCategory,
+  type DogRegistrationRequest,
+  type DogRegistrationResponse
+} from "@/lib/api"
 
 export default function InfoContent() {
   const router = useRouter()
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
+  const [isEditMode, setIsEditMode] = useState(false)
+  
+  // API에서 받아온 데이터
+  const [breeds, setBreeds] = useState<BreedOption[]>([])
+  const [allergyCategories, setAllergyCategories] = useState<AllergyCategory[]>([])
+  const [diseaseCategories, setDiseaseCategories] = useState<DiseaseCategory[]>([])
+  const [loading, setLoading] = useState(true)
+  
   const [petInfo, setPetInfo] = useState({
     name: "",
     birthday: "",
-    breed: "",
+    breedId: null as number | null,
     gender: "",
     weight: "",
-    ageGroup: "adult", // junior, adult, senior
-    allergies: "",
-    disease: "",
+    ageGroup: "성견" as "주니어" | "성견" | "시니어",
     medicine: "",
     photoUrl: "",
-    neutered: null, // 중성화 여부 추가
+    neutered: null as boolean | null,
   })
 
-  // 알레르기 상태
-  const [allergies, setAllergies] = useState<Record<string, boolean>>({})
+  // 알레르기 상태 (이제 ID 기반)
+  const [selectedAllergies, setSelectedAllergies] = useState<Set<number>>(new Set())
 
-  // 질병 이력 상태
-  const [diseases, setDiseases] = useState<Record<string, boolean>>({})
+  // 질병 이력 상태 (이제 ID 기반)
+  const [selectedDiseases, setSelectedDiseases] = useState<Set<number>>(new Set())
 
   // 기타 알레르기 및 질병 입력 상태
   const [otherAllergy, setOtherAllergy] = useState("")
   const [otherDisease, setOtherDisease] = useState("")
 
-  // 기존 데이터 불러오기
+  // API 데이터 로드
   useEffect(() => {
-    const savedPetInfo = getData("petInfo")
-    if (savedPetInfo) {
-      setPetInfo(savedPetInfo)
+    const loadData = async () => {
+      try {
+        setLoading(true)
+        
+        // URL 파라미터에서 mode 확인
+        const searchParams = new URLSearchParams(window.location.search)
+        const mode = searchParams.get('mode')
+        setIsEditMode(mode === 'edit')
+        
+        const [breedsData, allergiesData, diseasesData] = await Promise.all([
+          dogApi.getBreeds(),
+          dogApi.getAllergies(),
+          dogApi.getDiseases()
+        ])
+        
+        setBreeds(breedsData)
+        setAllergyCategories(allergiesData)
+        setDiseaseCategories(diseasesData)
+        
+        // 수정 모드일 때만 기존 데이터 로드
+        if (mode === 'edit') {
+          const savedPetInfo = localStorage.getItem('registeredPetInfo')
+          if (savedPetInfo) {
+            const existingDogInfo = JSON.parse(savedPetInfo)
+            setPetInfo({
+              name: existingDogInfo.name || "",
+              birthday: existingDogInfo.birthday || "",
+              breedId: existingDogInfo.breedId || null,
+              gender: existingDogInfo.gender || "",
+              weight: existingDogInfo.weight?.toString() || "",
+              ageGroup: existingDogInfo.ageGroup || "성견",
+              medicine: existingDogInfo.medicine || "",
+              photoUrl: existingDogInfo.photoUrl || "",
+              neutered: existingDogInfo.neutered || null,
+            })
+            
+            // 알레르기와 질병 ID 복원
+            if (existingDogInfo.allergyIds) {
+              setSelectedAllergies(new Set(existingDogInfo.allergyIds))
+            }
+            if (existingDogInfo.diseaseIds) {
+              setSelectedDiseases(new Set(existingDogInfo.diseaseIds))
+            }
+          }
+        }
+        
+
+        
+      } catch (error) {
+        console.error("데이터 로드 실패:", error)
+        toast({
+          title: "데이터 로드 실패",
+          description: "옵션 데이터를 불러오는데 실패했습니다. 새로고침 후 다시 시도해주세요.",
+          variant: "destructive",
+        })
+      } finally {
+        setLoading(false)
+      }
     }
 
-    // 건강 정보 불러오기
-    const healthInfo = getData("dogHealthInfo")
-    if (healthInfo) {
-      // 알레르기 설정
-      const allergyState: Record<string, boolean> = {}
-      healthInfo.allergies?.forEach((id: string) => {
-        allergyState[id] = true
-      })
-      setAllergies(allergyState)
-
-      // 질병 이력 설정
-      const diseaseState: Record<string, boolean> = {}
-      healthInfo.diseases?.forEach((id: string) => {
-        diseaseState[id] = true
-      })
-      setDiseases(diseaseState)
-
-      // 기타 항목 설정
-      setOtherAllergy(healthInfo.otherAllergy || "")
-      setOtherDisease(healthInfo.otherDisease || "")
-    }
+    loadData()
   }, [])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -82,12 +128,12 @@ export default function InfoContent() {
     setPetInfo((prev) => ({ ...prev, gender }))
   }
 
-  const handleAgeGroupSelect = (ageGroup: string) => {
+  const handleAgeGroupSelect = (ageGroup: "주니어" | "성견" | "시니어") => {
     setPetInfo((prev) => ({ ...prev, ageGroup }))
   }
 
-  const handleBreedSelect = (breed: string) => {
-    setPetInfo((prev) => ({ ...prev, breed }))
+  const handleBreedSelect = (breedId: number) => {
+    setPetInfo((prev) => ({ ...prev, breedId }))
   }
 
   const handleImageChange = (file: File | null) => {
@@ -102,14 +148,24 @@ export default function InfoContent() {
     }
   }
 
-  // 알레르기 토글 핸들러
-  const toggleAllergy = (id: string) => {
-    setAllergies((prev) => ({ ...prev, [id]: !prev[id] }))
+  const handleAllergyToggle = (allergyId: number) => {
+    const newSelection = new Set(selectedAllergies)
+    if (newSelection.has(allergyId)) {
+      newSelection.delete(allergyId)
+    } else {
+      newSelection.add(allergyId)
+    }
+    setSelectedAllergies(newSelection)
   }
 
-  // 질병 토글 핸들러
-  const toggleDisease = (id: string) => {
-    setDiseases((prev) => ({ ...prev, [id]: !prev[id] }))
+  const handleDiseaseToggle = (diseaseId: number) => {
+    const newSelection = new Set(selectedDiseases)
+    if (newSelection.has(diseaseId)) {
+      newSelection.delete(diseaseId)
+    } else {
+      newSelection.add(diseaseId)
+    }
+    setSelectedDiseases(newSelection)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,7 +173,7 @@ export default function InfoContent() {
     setIsSubmitting(true)
 
     // 필수 필드 검증
-    if (!petInfo.name || !petInfo.birthday || !petInfo.breed || !petInfo.gender) {
+    if (!petInfo.name || !petInfo.birthday || !petInfo.breedId || !petInfo.gender) {
       toast({
         title: "필수 정보를 입력해주세요",
         description: "이름, 생일, 품종, 성별은 필수 입력 항목입니다.",
@@ -127,68 +183,80 @@ export default function InfoContent() {
       return
     }
 
-    // 데이터 저장
-    saveData("petInfo", petInfo)
-
-    // 건강 데이터 초기화 (없는 경우)
-    const healthData = getData("healthData")
-    if (!healthData) {
-      saveData("healthData", {
-        walkDistance: 0,
-        feedCount: 0,
-        waterAmount: 0,
-        healthStatus: "양호",
-        activities: [],
-        weight: Number.parseFloat(petInfo.weight) || 5.0,
-        initialWeight: Number.parseFloat(petInfo.weight) || 5.0,
-      })
-    } else if (petInfo.weight && (!healthData.weight || healthData.weight !== Number.parseFloat(petInfo.weight))) {
-      // 체중이 변경된 경우 업데이트
-      saveData("healthData", {
-        ...healthData,
-        weight: Number.parseFloat(petInfo.weight),
-        initialWeight: healthData.initialWeight || Number.parseFloat(petInfo.weight),
-      })
-    }
-
-    // 건강 정보 저장
     try {
-      // 선택된 알레르기 항목 추출
-      const selectedAllergies = Object.entries(allergies)
-        .filter(([_, isChecked]) => isChecked)
-        .map(([id]) => id)
-
-      // 선택된 질병 항목 추출
-      const selectedDiseases = Object.entries(diseases)
-        .filter(([_, isChecked]) => isChecked)
-        .map(([id]) => id)
-
-      // 건강 정보 객체 생성
-      const healthInfo = {
-        allergies: selectedAllergies,
-        diseases: selectedDiseases,
-        otherAllergy,
-        otherDisease,
-        lastUpdated: new Date().toISOString(),
+      // 백엔드 API 요청 데이터 구성
+      const requestData: DogRegistrationRequest = {
+        name: petInfo.name,
+        birth_date: petInfo.birthday,
+        age_group: petInfo.ageGroup,
+        weight: parseFloat(petInfo.weight) || 5.0,
+        breed_id: petInfo.breedId,
+        gender: petInfo.gender as "남아" | "여아" | "중성화",
+        medication: petInfo.medicine || null,
+        allergy_ids: Array.from(selectedAllergies),
+        disease_ids: Array.from(selectedDiseases)
       }
 
-      // 로컬 스토리지에 저장
-      saveData("dogHealthInfo", healthInfo)
+      let result
+      if (isEditMode) {
+        // 수정 모드: 기존 정보 업데이트
+        const savedPetInfo = localStorage.getItem('registeredPetInfo')
+        const existingInfo = savedPetInfo ? JSON.parse(savedPetInfo) : {}
+        
+        const updatedInfo = {
+          ...existingInfo,
+          ...requestData,
+          allergyIds: requestData.allergy_ids,
+          diseaseIds: requestData.disease_ids
+        }
+        
+        localStorage.setItem('registeredPetInfo', JSON.stringify(updatedInfo))
+        result = updatedInfo
+        
+        // 실제 백엔드 연결 시 사용할 코드
+        // result = await dogApi.updateDog(existingInfo.id, requestData)
+      } else {
+        // 등록 모드: 새 반려견 정보 등록
+        result = await dogApi.registerDog(requestData)
+        
+        // 로컬스토리지에도 저장 (테스트용)
+        const savedInfo = {
+          ...requestData,
+          allergyIds: requestData.allergy_ids,
+          diseaseIds: requestData.disease_ids
+        }
+        localStorage.setItem('registeredPetInfo', JSON.stringify(savedInfo))
+      }
+      
+      // 성공 메시지 표시
+      toast({
+        title: isEditMode ? "수정 완료!" : "등록 완료!",
+        description: `${result.name}의 정보가 성공적으로 ${isEditMode ? '수정' : '등록'}되었습니다.`,
+      })
+
+      // 잠시 후 대시보드로 이동
+      setTimeout(() => {
+        setIsSubmitting(false)
+        router.push("/dashboard")
+      }, 1000)
+      
     } catch (error) {
-      console.error("Error saving health info:", error)
-    }
-
-    // 성공 메시지 표시
-    toast({
-      title: "정보가 저장되었습니다",
-      description: "반려견 정보가 성공적으로 저장되었습니다.",
-    })
-
-    // 잠시 후 대시보드로 이동
-    setTimeout(() => {
+      console.error("반려견 등록 실패:", error)
+      toast({
+        title: "등록 실패",
+        description: "반려견 정보 등록에 실패했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      })
       setIsSubmitting(false)
-      router.push("/dashboard")
-    }, 1000)
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-pink-50 flex justify-center items-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -243,6 +311,7 @@ export default function InfoContent() {
                   className="input-field w-full"
                   value={petInfo.birthday}
                   onChange={handleChange}
+                  max={new Date().toISOString().split('T')[0]}
                   required
                 />
               </div>
@@ -253,33 +322,33 @@ export default function InfoContent() {
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.ageGroup === "junior"
+                      petInfo.ageGroup === "주니어"
                         ? "bg-pink-500 border-pink-500 text-white"
                         : "bg-white border-pink-200 text-gray-700"
                     }`}
-                    onClick={() => handleAgeGroupSelect("junior")}
+                    onClick={() => handleAgeGroupSelect("주니어")}
                   >
                     주니어
                   </button>
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.ageGroup === "adult"
+                      petInfo.ageGroup === "성견"
                         ? "bg-pink-500 border-pink-500 text-white"
                         : "bg-white border-pink-200 text-gray-700"
                     }`}
-                    onClick={() => handleAgeGroupSelect("adult")}
+                    onClick={() => handleAgeGroupSelect("성견")}
                   >
                     성견
                   </button>
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.ageGroup === "senior"
+                      petInfo.ageGroup === "시니어"
                         ? "bg-pink-500 border-pink-500 text-white"
                         : "bg-white border-pink-200 text-gray-700"
                     }`}
-                    onClick={() => handleAgeGroupSelect("senior")}
+                    onClick={() => handleAgeGroupSelect("시니어")}
                   >
                     시니어
                   </button>
@@ -302,36 +371,18 @@ export default function InfoContent() {
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">품종</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {[
-                    "말티즈",
-                    "푸들",
-                    "포메라니안",
-                    "시츄",
-                    "웰시코기",
-                    "치와와",
-                    "비숑프리제",
-                    "요크셔테리어",
-                    "프렌치불독",
-                    "골든리트리버",
-                    "보더콜리",
-                    "비글",
-                    "닥스훈트",
-                    "시바이누",
-                    "진돗개",
-                    "믹스견",
-                    "기타",
-                  ].map((breed) => (
+                  {breeds.map((breed) => (
                     <button
-                      key={breed}
+                      key={breed.id}
                       type="button"
                       className={`h-12 rounded-xl border-2 ${
-                        petInfo.breed === breed.toLowerCase()
+                        petInfo.breedId === breed.id
                           ? "bg-pink-500 border-pink-500 text-white"
                           : "bg-white border-pink-200 text-gray-700"
                       }`}
-                      onClick={() => handleBreedSelect(breed.toLowerCase())}
+                      onClick={() => handleBreedSelect(breed.id)}
                     >
-                      {breed}
+                      {breed.name}
                     </button>
                   ))}
                 </div>
@@ -343,52 +394,35 @@ export default function InfoContent() {
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.gender === "male"
+                      petInfo.gender === "남아"
                         ? "bg-blue-500 border-blue-500 text-white"
                         : "bg-white border-blue-200 text-gray-700"
                     }`}
-                    onClick={() => handleGenderSelect("male")}
+                    onClick={() => handleGenderSelect("남아")}
                   >
                     남아
                   </button>
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.gender === "female"
+                      petInfo.gender === "여아"
                         ? "bg-pink-500 border-pink-500 text-white"
                         : "bg-white border-pink-200 text-gray-700"
                     }`}
-                    onClick={() => handleGenderSelect("female")}
+                    onClick={() => handleGenderSelect("여아")}
                   >
                     여아
                   </button>
-                </div>
-              </div>
-
-              <div className="space-y-2 mt-3">
-                <label className="block text-sm font-medium text-gray-700 mb-1">중성화 여부</label>
-                <div className="flex gap-3">
                   <button
                     type="button"
                     className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.neutered === true
+                      petInfo.gender === "중성화"
                         ? "bg-green-500 border-green-500 text-white"
                         : "bg-white border-green-200 text-gray-700"
                     }`}
-                    onClick={() => setPetInfo((prev) => ({ ...prev, neutered: true }))}
+                    onClick={() => handleGenderSelect("중성화")}
                   >
-                    예
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex-1 h-12 rounded-xl border-2 ${
-                      petInfo.neutered === false
-                        ? "bg-red-500 border-red-500 text-white"
-                        : "bg-white border-red-200 text-gray-700"
-                    }`}
-                    onClick={() => setPetInfo((prev) => ({ ...prev, neutered: false }))}
-                  >
-                    아니오
+                    중성화
                   </button>
                 </div>
               </div>
@@ -429,44 +463,25 @@ export default function InfoContent() {
                   <div className="space-y-6">
                     {allergyCategories.map((category, idx) => (
                       <div key={idx} className="space-y-2">
-                        <h4 className="font-medium text-sm text-gray-700">{category.name}</h4>
+                        <h4 className="font-medium text-sm text-gray-700">{category.category}</h4>
                         <div className="flex flex-wrap gap-2">
                           {category.items.map((item) => (
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() => toggleAllergy(item.id)}
+                              onClick={() => handleAllergyToggle(item.id)}
                               className={`px-3 py-1.5 rounded-full text-sm ${
-                                allergies[item.id]
+                                selectedAllergies.has(item.id)
                                   ? "bg-pink-500 text-white"
                                   : "bg-white border-2 border-pink-200 text-gray-700"
                               }`}
                             >
-                              {item.label}
+                              {item.name}
                             </button>
                           ))}
                         </div>
                       </div>
                     ))}
-
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm text-gray-700">기타 알레르기</h4>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          placeholder="기타 알레르기가 있다면 입력해주세요"
-                          value={otherAllergy}
-                          onChange={(e) => setOtherAllergy(e.target.value)}
-                          className="input-field flex-1"
-                        />
-                        <button
-                          type="button"
-                          className="h-10 w-10 rounded-full bg-pink-500 text-white flex items-center justify-center"
-                          onClick={() => setOtherAllergy((prev) => (prev ? `${prev}, ` : ""))}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </ScrollArea>
               </div>
@@ -484,44 +499,25 @@ export default function InfoContent() {
                   <div className="space-y-6">
                     {diseaseCategories.map((category, idx) => (
                       <div key={idx} className="space-y-2">
-                        <h4 className="font-medium text-sm text-gray-700">{category.name}</h4>
+                        <h4 className="font-medium text-sm text-gray-700">{category.category}</h4>
                         <div className="flex flex-wrap gap-2">
                           {category.items.map((item) => (
                             <button
                               key={item.id}
                               type="button"
-                              onClick={() => toggleDisease(item.id)}
+                              onClick={() => handleDiseaseToggle(item.id)}
                               className={`px-3 py-1.5 rounded-full text-sm ${
-                                diseases[item.id]
+                                selectedDiseases.has(item.id)
                                   ? "bg-blue-500 text-white"
                                   : "bg-white border-2 border-blue-200 text-gray-700"
                               }`}
                             >
-                              {item.label}
+                              {item.name}
                             </button>
                           ))}
                         </div>
                       </div>
                     ))}
-
-                    <div className="space-y-2">
-                      <h4 className="font-medium text-sm text-gray-700">기타 질병</h4>
-                      <div className="flex items-center space-x-2">
-                        <input
-                          placeholder="기타 질병이 있다면 입력해주세요"
-                          value={otherDisease}
-                          onChange={(e) => setOtherDisease(e.target.value)}
-                          className="input-field flex-1"
-                        />
-                        <button
-                          type="button"
-                          className="h-10 w-10 rounded-full bg-blue-500 text-white flex items-center justify-center"
-                          onClick={() => setOtherDisease((prev) => (prev ? `${prev}, ` : ""))}
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </div>
                   </div>
                 </ScrollArea>
               </div>

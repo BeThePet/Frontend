@@ -5,23 +5,24 @@ import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import {
-  Calendar,
-  FileText,
-  Scale,
-  Pill,
-  Bell,
-  Heart,
+  Dog,
   Bone,
+  Brain,
+  BarChart3,
+  Heart,
+  MapPin,
+  Droplets,
+  Scale,
+  Calendar,
+  Pill,
+  AlertTriangle,
+  Clock,
+  Check,
   PawPrint,
-  Stethoscope,
-  Syringe,
-  Thermometer,
-  Clipboard,
   Settings,
   LogOut,
-  Activity,
-  AlertTriangle,
-  Utensils,
+  User,
+  Edit,
 } from "lucide-react"
 import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
@@ -29,28 +30,43 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getData, saveData } from "@/lib/storage"
 import { LinkButton } from "@/components/ui/link-button"
+import { userApi } from "@/lib/api"
 
 export default function DashboardContent() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [petInfo, setPetInfo] = useState<any>(null)
+  const [healthData, setHealthData] = useState<any>(null)
   const [medications, setMedications] = useState<any[]>([])
+  const [todayChecked, setTodayChecked] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [showUserMenu, setShowUserMenu] = useState(false)
+  const [userInfo, setUserInfo] = useState<any>(null)
 
   useEffect(() => {
     setMounted(true)
     
     const loadData = async () => {
       try {
-        // 로그인 상태 확인 (예시: localStorage에서 토큰 확인)
+        // 로그인 상태 확인
         const token = localStorage.getItem("token")
         setIsLoggedIn(!!token)
 
-        // 반려견 정보 불러오기
-        const savedPetInfo = getData("petInfo")
+        if (token) {
+          // 사용자 정보 로드
+          try {
+            const userData = await userApi.getCurrentUser()
+            setUserInfo(userData)
+          } catch (error) {
+            console.error("사용자 정보 로드 실패:", error)
+          }
+        }
+
+        // 반려견 정보 불러오기 (새로운 저장 방식)
+        const savedPetInfo = localStorage.getItem('registeredPetInfo')
         if (savedPetInfo) {
-          setPetInfo(savedPetInfo)
+          setPetInfo(JSON.parse(savedPetInfo))
         }
 
         // 약 정보 불러오기
@@ -58,6 +74,19 @@ export default function DashboardContent() {
         if (savedMedications) {
           setMedications(savedMedications)
         }
+
+        // 건강 데이터 불러오기
+        const savedHealthData = getData("healthData")
+        if (savedHealthData) {
+          setHealthData(savedHealthData)
+        }
+
+        // 오늘의 체크 여부 확인
+        const today = new Date()
+        const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`
+        const todayCheck = getData(`dailyCheck_${formattedDate}`)
+        setTodayChecked(!!todayCheck)
+
       } catch (error) {
         console.error("데이터 로딩 중 오류:", error)
       } finally {
@@ -68,12 +97,42 @@ export default function DashboardContent() {
     loadData()
   }, [])
 
-  // 반려견 정보가 없고 로그인 상태일 때만 리디렉션
-  useEffect(() => {
-    if (!isLoading && !petInfo && mounted && isLoggedIn) {
-      router.push("/info")
+  // 리디렉션 로직 제거 - 대시보드에서 직접 등록 유도 UI 표시
+
+  // 나이 계산 함수
+  const calculateAge = (birthday: string) => {
+    if (!birthday) return "나이 정보 없음"
+
+    const birthDate = new Date(birthday)
+    const today = new Date()
+    let age = today.getFullYear() - birthDate.getFullYear()
+
+    if (
+      today.getMonth() < birthDate.getMonth() ||
+      (today.getMonth() === birthDate.getMonth() && today.getDate() < birthDate.getDate())
+    ) {
+      age--
     }
-  }, [isLoading, petInfo, mounted, router, isLoggedIn])
+
+    return `${age}살`
+  }
+
+  const handleLogout = async () => {
+    if (!confirm('로그아웃 하시겠습니까?')) {
+      return
+    }
+
+    try {
+      await userApi.logout()
+      setIsLoggedIn(false)
+      setUserInfo(null)
+      setPetInfo(null)
+      router.push("/")
+    } catch (error) {
+      console.error('로그아웃 실패:', error)
+      alert('로그아웃 중 오류가 발생했습니다.')
+    }
+  }
 
   // 로딩 중이면 로딩 화면 표시
   if (!mounted || isLoading) {
@@ -84,88 +143,283 @@ export default function DashboardContent() {
     )
   }
 
-  // 비로그인 상태일 때 데모 UI 표시
-  if (!isLoggedIn) {
-    return (
-      <div className="min-h-screen bg-beige pb-20">
-        <div className="bg-blue-light p-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-                <PawPrint className="w-6 h-6 text-blue-DEFAULT" />
-              </div>
-              <div>
-                <h1 className="text-lg font-bold text-gray-800">멍멍케어 체험하기</h1>
-                <p className="text-sm text-gray-600">서비스를 먼저 둘러보세요!</p>
-              </div>
-            </div>
+  // 비로그인 상태일 때는 로그인 유도 메시지 포함
+
+  // 로그인 상태에서 반려견 미등록 시는 대시보드 내에서 처리
+
+  // 오늘 복용할 약 필터링
+  const todayMedications = medications.filter((med: any) => med.isActive)
+
+  // 오늘 날짜 구하기
+  const today = new Date()
+  const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`
+
+  // 오늘 기록된 활동만 필터링
+  const todayActivities = healthData?.activities
+    ? healthData.activities.filter((activity: any) => activity.date === formattedDate)
+    : []
+
+  const container = {
+    hidden: { opacity: 0 },
+    show: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05,
+      },
+    },
+  }
+
+  const item = {
+    hidden: { y: 20, opacity: 0 },
+    show: { y: 0, opacity: 1 },
+  }
+
+  return (
+    <div className="min-h-screen bg-pink-50 dashboard-landscape overflow-y-auto">
+      {/* 상단: 로고, 반려견 프로필, 설정 및 로그아웃 */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3 }}
+        className="bg-pink-200 rounded-b-3xl p-6 shadow-md profile-section"
+      >
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">멍멍케어</h1>
+            <p className="text-sm text-gray-600">
+              {!isLoggedIn ? "서비스를 체험해보세요" : "반려견 건강 파트너"}
+            </p>
           </div>
+          
+          {/* 설정 및 로그아웃 버튼 */}
+          {isLoggedIn && (
+            <div className="flex gap-2">
+              <div className="relative">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className="bg-white/80 hover:bg-white"
+                >
+                  <Settings className="w-5 h-5 text-gray-600" />
+                </Button>
+                
+                {/* 사용자 메뉴 드롭다운 */}
+                {showUserMenu && (
+                  <div className="absolute right-0 top-12 bg-white rounded-lg shadow-lg border border-gray-200 p-2 min-w-48 z-10">
+                    {userInfo && (
+                      <div className="px-3 py-2 border-b border-gray-100">
+                        <p className="text-sm font-medium text-gray-800">{userInfo.nickname}</p>
+                        <p className="text-xs text-gray-500">{userInfo.email}</p>
+                      </div>
+                    )}
+                    <Link href="/info/detail">
+                      <div className="flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded">
+                        <Edit className="w-4 h-4" />
+                        반려견 정보 관리
+                      </div>
+                    </Link>
+                    <button
+                      onClick={() => setShowUserMenu(false)}
+                      className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded"
+                    >
+                      <User className="w-4 h-4" />
+                      내 정보
+                    </button>
+                  </div>
+                )}
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="bg-white/80 hover:bg-white"
+              >
+                <LogOut className="w-5 h-5 text-gray-600" />
+              </Button>
+            </div>
+          )}
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="p-5 space-y-6"
-        >
-          {/* 데모 프로필 카드 */}
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-4">
-                <div className="relative w-20 h-20">
-                  <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center">
-                    <PawPrint className="w-8 h-8 text-gray-400" />
-                  </div>
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">데모 프로필</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                      체험용
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">
-                    로그인하고 나만의 반려견 프로필을 만들어보세요!
-                  </p>
+        {/* 반려견 프로필 카드 */}
+        {petInfo ? (
+          <Link href="/info/detail" className="block">
+            <div className="flex items-center gap-4 mt-4 bg-white p-3 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 transition-colors">
+              <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center">
+                {petInfo?.photoUrl ? (
+                  <Image
+                    src={petInfo.photoUrl}
+                    alt={petInfo.name || "반려견"}
+                    width={64}
+                    height={64}
+                    className="rounded-full object-cover w-full h-full"
+                  />
+                ) : (
+                  <Dog className="w-8 h-8 text-pink-400" />
+                )}
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">{petInfo.name}</h2>
+                <div className="flex gap-3 text-sm text-gray-600">
+                  <span>{calculateAge(petInfo.birthday)}</span>
+                  <span>•</span>
+                  <span>{petInfo.gender === "남아" ? "남아" : petInfo.gender === "여아" ? "여아" : petInfo.gender}</span>
+                  {petInfo.weight && (
+                    <>
+                      <span>•</span>
+                      <span>{petInfo.weight}kg</span>
+                    </>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-
-          {/* 주요 기능 카드 */}
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardContent className="p-5">
-              <h3 className="font-bold text-gray-800 mb-4">주요 기능 둘러보기</h3>
-              <div className="grid grid-cols-2 gap-3">
-                <Link href="/health-record">
-                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
-                    <Activity className="w-5 h-5 text-blue-500" />
-                    <span className="text-sm">건강 기록</span>
-                  </Button>
-                </Link>
-                <Link href="/medication">
-                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
-                    <Pill className="w-5 h-5 text-purple-500" />
-                    <span className="text-sm">약 복용 관리</span>
-                  </Button>
-                </Link>
-                <Link href="/food">
-                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
-                    <Utensils className="w-5 h-5 text-green-500" />
-                    <span className="text-sm">사료 정보</span>
-                  </Button>
-                </Link>
-                <Link href="/emergency">
-                  <Button variant="outline" className="w-full h-auto py-3 flex flex-col items-center gap-2">
-                    <AlertTriangle className="w-5 h-5 text-red-500" />
-                    <span className="text-sm">긴급 상황</span>
-                  </Button>
-                </Link>
+            </div>
+          </Link>
+        ) : (
+          <Link href="/info" className="block">
+            <div className="flex items-center gap-4 mt-4 bg-white p-3 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 transition-colors">
+              <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center">
+                <Dog className="w-8 h-8 text-pink-400" />
               </div>
-            </CardContent>
-          </Card>
+              <div>
+                <h2 className="text-xl font-bold text-gray-800">반려견 정보 등록하기</h2>
+                <div className="flex gap-3 text-sm text-gray-600">
+                  <span className="text-pink-500">정보를 입력해주세요 →</span>
+                </div>
+              </div>
+            </div>
+          </Link>
+        )}
+      </motion.div>
 
-          {/* 로그인 유도 카드 */}
+      {/* 서비스 카드 */}
+      <div className="px-5 py-4">
+        <h3 className="text-lg font-semibold mb-4 text-gray-800">서비스</h3>
+        <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-4 gap-3">
+          <motion.div variants={item}>
+            <ServiceCard href="/health-record" icon={<Check className="w-6 h-6 text-green-500" />} title="건강기록" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/medication" icon={<Pill className="w-6 h-6 text-pink-500" />} title="약 관리" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/report" icon={<BarChart3 className="w-6 h-6 text-green-500" />} title="리포트" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/info" icon={<Dog className="w-6 h-6 text-pink-500" />} title="정보관리" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard
+              href="/emergency"
+              icon={<AlertTriangle className="w-6 h-6 text-red-500" />}
+              title="응급가이드"
+            />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/ai-assistant" icon={<Brain className="w-6 h-6 text-purple-500" />} title="AI 챗봇" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/food" icon={<Bone className="w-6 h-6 text-blue-500" />} title="사료추천" />
+          </motion.div>
+          <motion.div variants={item}>
+            <ServiceCard href="/mbti" icon={<Heart className="w-6 h-6 text-pink-500" />} title="MBTI" />
+          </motion.div>
+        </motion.div>
+      </div>
+
+      {/* 건강 체크 및 약 복용 알림 - 로그인 상태에서만 표시 */}
+      {isLoggedIn && (
+        <div className="px-5 py-4">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.3 }}
+            className="space-y-3"
+          >
+            {/* 일일 건강 체크 카드 */}
+            <Link href="/health-record?today=true">
+              <Card
+                className={`bg-white rounded-xl shadow-sm border-2 ${todayChecked ? "border-green-100" : "border-amber-100"}`}
+              >
+                <CardContent className="p-4 flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center ${todayChecked ? "bg-green-100" : "bg-amber-100"}`}
+                    >
+                      {todayChecked ? (
+                        <Calendar className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <Calendar className="w-5 h-5 text-amber-600" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-800">오늘의 기록</h3>
+                      <p className="text-xs text-gray-600">
+                        {todayChecked ? "오늘의 건강 체크를 완료했습니다." : "오늘의 건강 체크가 필요합니다."}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge
+                    variant={todayChecked ? "outline" : "secondary"}
+                    className={todayChecked ? "bg-green-50 text-green-700 border-green-200" : "text-gray-700"}
+                  >
+                    {todayChecked ? "완료" : "필요"}
+                  </Badge>
+                </CardContent>
+              </Card>
+            </Link>
+
+            {/* 약 복용 알림 카드 */}
+            {todayMedications.length > 0 && (
+              <Link href="/medication">
+                <Card className="bg-white rounded-xl shadow-sm border-2 border-pink-100">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full flex items-center justify-center bg-pink-100">
+                          <Pill className="w-5 h-5 text-pink-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-medium text-gray-800">약 복용 알림</h3>
+                          <p className="text-xs text-gray-600">
+                            {todayMedications.length > 0
+                              ? `오늘 복용할 약이 ${todayMedications.length}개 있어요`
+                              : "등록된 약이 없어요"}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200">
+                        {todayMedications.length}개
+                      </Badge>
+                    </div>
+
+                    {todayMedications.length > 0 && (
+                      <div className="mt-2 p-2 bg-pink-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-pink-500" />
+                          <span className="text-sm font-medium text-pink-700">
+                            {todayMedications[0].name} • {todayMedications[0].time}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </Link>
+            )}
+          </motion.div>
+        </div>
+      )}
+
+      {/* 하단: 오늘의 기록 카드 또는 로그인 유도 */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.5, duration: 0.3 }}
+        className="px-5 mt-6 pb-20"
+      >
+        {!isLoggedIn ? (
+          // 비로그인 상태일 때 로그인 유도 카드
           <Card className="bg-white rounded-xl shadow-sm border-pink-100">
             <CardContent className="p-5">
               <div className="text-center">
@@ -182,251 +436,138 @@ export default function DashboardContent() {
               </div>
             </CardContent>
           </Card>
-        </motion.div>
-      </div>
-    )
-  }
-
-  // 로그인 상태에서 반려견 미등록 시
-  if (isLoggedIn && !petInfo) {
-    return (
-      <div className="min-h-screen bg-beige flex flex-col items-center justify-center p-6">
-        <div className="text-center mb-8">
-          <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <PawPrint className="w-12 h-12 text-pink-500" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">반려견 정보 등록하기</h2>
-          <p className="text-gray-600 mb-6">
-            반려견 정보를 등록하고<br />
-            맞춤형 건강 관리를 시작해보세요
-          </p>
-          <Link href="/info">
-            <Button className="w-full max-w-xs bg-pink-500 hover:bg-pink-600">
-              반려견 등록하기
-            </Button>
-          </Link>
-        </div>
-      </div>
-    )
-  }
-
-  // 활성화된 약 목록
-  const activeMedications = medications.filter((med: any) => med.isActive)
-
-  return (
-    <div className="min-h-screen bg-beige pb-20">
-      {/* 헤더 */}
-      <div className="bg-blue-light p-4">
-        <div className="flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center">
-              <PawPrint className="w-6 h-6 text-blue-DEFAULT" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-gray-800">{petInfo?.name || "반려견"}의 건강수첩</h1>
-              <p className="text-sm text-gray-600">오늘도 건강한 하루 보내세요!</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/settings">
-              <Button size="icon" variant="ghost" className="text-gray-600">
-                <Settings className="w-5 h-5" />
-              </Button>
-            </Link>
-            <Link href="/auth/logout">
-              <Button size="icon" variant="ghost" className="text-gray-600">
-                <LogOut className="w-5 h-5" />
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 메인 컨텐츠 */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="p-5 space-y-6"
-      >
-        {/* 반려견 프로필 */}
-        <Card className="bg-white rounded-xl shadow-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-4">
-              <div className="relative w-20 h-20">
-                {petInfo?.image ? (
-                  <Image
-                    src={petInfo.image}
-                    alt="반려견 프로필"
-                    fill
-                    className="rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gray-200 rounded-full flex items-center justify-center">
-                    <PawPrint className="w-8 h-8 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">{petInfo?.name}</h2>
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                    {petInfo?.breed}
-                  </Badge>
-                  {petInfo?.mbti && (
-                    <Badge variant="outline" className="bg-pink-50 text-pink-700 border-pink-200">
-                      {petInfo.mbti}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-4 mt-2">
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Bone className="w-4 h-4" />
-                    <span>{petInfo?.age}살</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Scale className="w-4 h-4" />
-                    <span>{petInfo?.weight}kg</span>
-                  </div>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <Heart className="w-4 h-4" />
-                    <span>{petInfo?.gender}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 건강 관리 메뉴 */}
-        <Card className="bg-white rounded-xl shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg font-semibold text-gray-800">건강 관리</CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/health-record?tab=health&today=true">
-                <Button className="w-full h-20 rounded-xl bg-pink-100 hover:bg-pink-200 text-pink-700 flex flex-col items-center justify-center">
-                  <Calendar className="w-5 h-5 mb-1" />
-                  <span className="text-sm">건강 체크</span>
-                </Button>
-              </Link>
-              <Link href="/report/medication">
-                <Button className="w-full h-20 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-700 flex flex-col items-center justify-center">
-                  <Pill className="w-5 h-5 mb-1" />
-                  <span className="text-sm">약 복용 관리</span>
-                </Button>
-              </Link>
-              <Link href="/report/vaccine">
-                <Button className="w-full h-20 rounded-xl bg-green-100 hover:bg-green-200 text-green-700 flex flex-col items-center justify-center">
-                  <FileText className="w-5 h-5 mb-1" />
-                  <span className="text-sm">예방접종 기록</span>
-                </Button>
-              </Link>
-              <Link href="/health-record?tab=weight">
-                <Button className="w-full h-20 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 flex flex-col items-center justify-center">
-                  <Scale className="w-5 h-5 mb-1" />
-                  <span className="text-sm">체중 기록</span>
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* 약 복용 알림 */}
-        {activeMedications.length > 0 && (
-          <Card className="bg-white rounded-xl shadow-sm">
-            <CardHeader className="pb-2">
-              <div className="flex justify-between items-center">
-                <CardTitle className="text-lg font-semibold text-gray-800">약 복용 알림</CardTitle>
-                <LinkButton href="/report/medication" variant="outline" size="sm">
-                  모두 보기
-                </LinkButton>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="space-y-3">
-                {activeMedications.slice(0, 2).map((med: any) => (
-                  <div key={med.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <Pill className="h-5 w-5 text-pink-500" />
-                      <div>
-                        <div className="font-medium">{med.name}</div>
-                        <div className="text-sm text-gray-600">{med.dosage}</div>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium">{med.time}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 건강 기록 */}
-        <Card className="bg-white rounded-xl shadow-sm">
-          <CardHeader className="pb-2">
-            <div className="flex justify-between items-center">
-              <CardTitle className="text-lg font-semibold text-gray-800">건강 기록</CardTitle>
-              <LinkButton href="/health-record" variant="outline" size="sm">
-                모두 보기
+        ) : (
+          // 로그인 상태일 때 오늘의 기록 카드
+          <>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">오늘의 기록</h3>
+              <LinkButton href="/report" variant="outline" size="sm">
+                자세히 보기
               </LinkButton>
             </div>
-          </CardHeader>
-          <CardContent className="pt-0">
-            <div className="grid grid-cols-2 gap-3">
-              <Link href="/health-record?tab=health">
-                <Button
-                  variant="outline"
-                  className="w-full h-16 justify-start gap-3 border-gray-200"
-                >
-                  <Stethoscope className="w-5 h-5 text-pink-500" />
-                  <div className="text-left">
-                    <div className="font-medium">건강 체크</div>
-                    <div className="text-xs text-gray-500">매일 체크하기</div>
-                  </div>
-                </Button>
-              </Link>
-              <Link href="/health-record?tab=weight">
-                <Button
-                  variant="outline"
-                  className="w-full h-16 justify-start gap-3 border-gray-200"
-                >
-                  <Scale className="w-5 h-5 text-purple-500" />
-                  <div className="text-left">
-                    <div className="font-medium">체중 기록</div>
-                    <div className="text-xs text-gray-500">변화 추이 보기</div>
-                  </div>
-                </Button>
-              </Link>
-              <Link href="/report/vaccine">
-                <Button
-                  variant="outline"
-                  className="w-full h-16 justify-start gap-3 border-gray-200"
-                >
-                  <Syringe className="w-5 h-5 text-green-500" />
-                  <div className="text-left">
-                    <div className="font-medium">예방접종</div>
-                    <div className="text-xs text-gray-500">접종 내역 확인</div>
-                  </div>
-                </Button>
-              </Link>
-              <Link href="/report/medical">
-                <Button
-                  variant="outline"
-                  className="w-full h-16 justify-start gap-3 border-gray-200"
-                >
-                  <Clipboard className="w-5 h-5 text-blue-500" />
-                  <div className="text-left">
-                    <div className="font-medium">진료 기록</div>
-                    <div className="text-xs text-gray-500">병원 방문 기록</div>
-                  </div>
-                </Button>
-              </Link>
+            <div className="bg-white rounded-xl shadow-sm border-2 border-pink-100 p-4">
+              {/* 빠른 기록 버튼 */}
+              <div className="grid grid-cols-4 gap-3 mb-4">
+                <Link href="/health-record?tab=walk">
+                  <Button className="w-full h-16 rounded-xl bg-blue-100 hover:bg-blue-200 text-blue-700 flex flex-col items-center justify-center">
+                    <MapPin className="w-5 h-5 mb-1" />
+                    <span className="text-xs">산책</span>
+                  </Button>
+                </Link>
+                <Link href="/health-record?tab=feed">
+                  <Button className="w-full h-16 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-700 flex flex-col items-center justify-center">
+                    <Bone className="w-5 h-5 mb-1" />
+                    <span className="text-xs">사료</span>
+                  </Button>
+                </Link>
+                <Link href="/health-record?tab=water">
+                  <Button className="w-full h-16 rounded-xl bg-purple-100 hover:bg-purple-200 text-purple-700 flex flex-col items-center justify-center">
+                    <Droplets className="w-5 h-5 mb-1" />
+                    <span className="text-xs">물</span>
+                  </Button>
+                </Link>
+                <Link href="/health-record?tab=weight">
+                  <Button className="w-full h-16 rounded-xl bg-green-100 hover:bg-green-200 text-green-700 flex flex-col items-center justify-center">
+                    <Scale className="w-5 h-5 mb-1" />
+                    <span className="text-xs">체중</span>
+                  </Button>
+                </Link>
+              </div>
+
+              {todayActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {todayActivities.slice(0, 3).map((activity: any, index: number) => (
+                    <ActivityItem
+                      key={index}
+                      icon={
+                        activity.type === "feed" ? (
+                          <Bone className="w-5 h-5 text-amber-500" />
+                        ) : activity.type === "walk" ? (
+                          <MapPin className="w-5 h-5 text-blue-500" />
+                        ) : activity.type === "water" ? (
+                          <Droplets className="w-5 h-5 text-purple-500" />
+                        ) : activity.type === "health" ? (
+                          <Heart className="w-5 h-5 text-red-500" />
+                        ) : (
+                          <Scale className="w-5 h-5 text-green-500" />
+                        )
+                      }
+                      title={
+                        activity.type === "feed"
+                          ? "사료 급여"
+                          : activity.type === "walk"
+                            ? "산책"
+                            : activity.type === "water"
+                              ? "물 섭취"
+                              : activity.type === "health"
+                                ? "건강 체크"
+                                : "체중 측정"
+                      }
+                      time={activity.time}
+                      description={activity.description}
+                    />
+                  ))}
+                  {todayActivities.length > 3 && (
+                    <Link
+                      href="/health-record?today=true"
+                      className="text-pink-500 text-sm font-medium block text-center mt-2"
+                    >
+                      더 보기
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center py-4">
+                  <p className="text-gray-500">기록된 활동이 없습니다.</p>
+                  <Link href="/health-record?today=true" className="text-pink-500 text-sm font-medium mt-2 inline-block">
+                    건강 기록하기
+                  </Link>
+                </div>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </>
+        )}
       </motion.div>
+    </div>
+  )
+}
+
+// 서비스 카드 컴포넌트
+function ServiceCard({ href, icon, title }: { href: string; icon: React.ReactNode; title: string }) {
+  return (
+    <Link href={href}>
+      <div className="bg-white hover:bg-gray-50 transition-colors rounded-xl shadow-sm border-2 border-pink-100 active:scale-95 transition-transform">
+        <div className="p-3 flex flex-col items-center justify-center text-center">
+          <div className="bg-pink-50 p-2 rounded-full mb-1">{icon}</div>
+          <span className="text-xs font-medium text-gray-700">{title}</span>
+        </div>
+      </div>
+    </Link>
+  )
+}
+
+// 활동 항목 컴포넌트
+function ActivityItem({
+  icon,
+  title,
+  time,
+  description,
+}: {
+  icon: React.ReactNode
+  title: string
+  time: string
+  description: string
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <div className="bg-pink-50 p-2 rounded-full">{icon}</div>
+      <div className="flex-1">
+        <div className="flex justify-between">
+          <span className="text-sm font-medium text-gray-800">{title}</span>
+          <span className="text-xs text-gray-500">{time}</span>
+        </div>
+        <p className="text-xs text-gray-600">{description}</p>
+      </div>
     </div>
   )
 } 

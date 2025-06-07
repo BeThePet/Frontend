@@ -239,6 +239,53 @@ export interface MbtiResponse {
   created_at: string
 }
 
+// 새로운 반려견 등록 관련 타입들 추가
+export interface BreedOption {
+  id: number
+  name: string
+}
+
+export interface AllergyCategory {
+  category: string
+  items: {
+    id: number
+    name: string
+  }[]
+}
+
+export interface DiseaseCategory {
+  category: string
+  items: {
+    id: number
+    name: string
+  }[]
+}
+
+export interface DogRegistrationRequest {
+  name: string
+  birth_date: string
+  age_group: "주니어" | "성견" | "시니어"
+  weight: number
+  breed_id: number | null
+  gender: "남아" | "여아" | "중성화"
+  medication?: string | null
+  allergy_ids?: number[]
+  disease_ids?: number[]
+}
+
+export interface DogRegistrationResponse {
+  id: number
+  name: string
+  birth_date: string
+  age_group: "주니어" | "성견" | "시니어"
+  weight: number
+  gender: "남아" | "여아" | "중성화"
+  medication?: string | null
+  breed_name: string
+  allergy_names: string[]
+  disease_names: string[]
+}
+
 // Mock medication data for development
 const generateTestTime = () => {
   const now = new Date()
@@ -448,6 +495,65 @@ export const medicationApi = {
   }
 }
 
+// User API functions
+export const userApi = {
+  // Get current user info (GET /user/me/)
+  getCurrentUser: async (): Promise<{ email: string; nickname: string }> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // Mock: 로컬스토리지에서 유저 정보 가져오기
+    const user = localStorage.getItem("user")
+    if (user) {
+      const userInfo = JSON.parse(user)
+      return {
+        email: userInfo.email,
+        nickname: userInfo.name
+      }
+    }
+    
+    // 실제 백엔드 연결 시 사용할 코드
+    // const response = await fetch('/user/me/', {
+    //   method: 'GET',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${localStorage.getItem('token')}`
+    //   },
+    // })
+    
+    // if (!response.ok) {
+    //   throw new Error('Failed to fetch user info')
+    // }
+    
+    // return response.json()
+    
+    throw new Error('User not found')
+  },
+
+  // Logout (POST /user/logout/)
+  logout: async (): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // Mock: 로컬스토리지 토큰 제거
+    localStorage.removeItem("token")
+    localStorage.removeItem("user")
+    
+    // 실제 백엔드 연결 시 사용할 코드
+    // const response = await fetch('/user/logout/', {
+    //   method: 'POST',
+    //   headers: {
+    //     'Content-Type': 'application/json',
+    //     'Authorization': `Bearer ${localStorage.getItem('token')}`
+    //   },
+    // })
+    
+    // if (response.status !== 204) {
+    //   throw new Error('Failed to logout')
+    // }
+    
+    console.log('로그아웃 완료')
+  }
+}
+
 // MBTI API functions
 export const mbtiApi = {
   // Save MBTI result (POST)
@@ -496,6 +602,400 @@ export const mbtiApi = {
     return {
       mbti_type: "ENFP",
       created_at: new Date().toISOString()
+    }
+  }
+}
+
+// 반려견 등록 관련 Mock 데이터
+const mockBreeds: BreedOption[] = [
+  { id: 1, name: "말티즈" },
+  { id: 2, name: "푸들" },
+  { id: 3, name: "포메라니안" },
+  { id: 4, name: "시츄" },
+  { id: 5, name: "웰시코기" },
+  { id: 6, name: "치와와" },
+  { id: 7, name: "비숑프리제" },
+  { id: 8, name: "요크셔테리어" },
+  { id: 9, name: "프렌치불독" },
+  { id: 10, name: "골든리트리버" },
+  { id: 11, name: "보더콜리" },
+  { id: 12, name: "비글" },
+  { id: 13, name: "닥스훈트" },
+  { id: 14, name: "시바이누" },
+  { id: 15, name: "진돗개" },
+  { id: 16, name: "믹스견" },
+  { id: 17, name: "기타" }
+]
+
+const mockAllergies: AllergyCategory[] = [
+  {
+    category: "단백질 및 육류",
+    items: [
+      { id: 1, name: "닭고기" },
+      { id: 2, name: "소고기" },
+      { id: 3, name: "돼지고기" },
+      { id: 4, name: "양고기" },
+      { id: 5, name: "칠면조" },
+      { id: 6, name: "오리고기" },
+      { id: 7, name: "토끼고기" },
+      { id: 8, name: "사슴고기" },
+      { id: 9, name: "캥거루고기" },
+      { id: 10, name: "메추라기" }
+    ]
+  },
+  {
+    category: "해산물",
+    items: [
+      { id: 11, name: "연어" },
+      { id: 12, name: "참치" },
+      { id: 13, name: "흰살생선" },
+      { id: 14, name: "조개류" },
+      { id: 15, name: "새우" },
+      { id: 16, name: "게" },
+      { id: 17, name: "오징어" },
+      { id: 18, name: "멸치" },
+      { id: 19, name: "고등어" },
+      { id: 20, name: "정어리" }
+    ]
+  },
+  {
+    category: "곡물",
+    items: [
+      { id: 21, name: "밀" },
+      { id: 22, name: "옥수수" },
+      { id: 23, name: "대두" },
+      { id: 24, name: "쌀" },
+      { id: 25, name: "보리" },
+      { id: 26, name: "귀리" },
+      { id: 27, name: "호밀" },
+      { id: 28, name: "퀴노아" },
+      { id: 29, name: "기장" },
+      { id: 30, name: "메밀" }
+    ]
+  },
+  {
+    category: "유제품",
+    items: [
+      { id: 31, name: "우유" },
+      { id: 32, name: "치즈" },
+      { id: 33, name: "요거트" },
+      { id: 34, name: "버터" },
+      { id: 35, name: "크림" },
+      { id: 36, name: "아이스크림" },
+      { id: 37, name: "유청" },
+      { id: 38, name: "카제인" }
+    ]
+  },
+  {
+    category: "견과류 및 씨앗",
+    items: [
+      { id: 39, name: "땅콩" },
+      { id: 40, name: "아몬드" },
+      { id: 41, name: "호두" },
+      { id: 42, name: "캐슈넛" },
+      { id: 43, name: "피스타치오" },
+      { id: 44, name: "아마씨" },
+      { id: 45, name: "참깨" },
+      { id: 46, name: "해바라기씨" },
+      { id: 47, name: "호박씨" }
+    ]
+  },
+  {
+    category: "과일 및 채소",
+    items: [
+      { id: 48, name: "사과" },
+      { id: 49, name: "바나나" },
+      { id: 50, name: "당근" },
+      { id: 51, name: "감자" },
+      { id: 52, name: "토마토" },
+      { id: 53, name: "아보카도" },
+      { id: 54, name: "브로콜리" },
+      { id: 55, name: "시금치" },
+      { id: 56, name: "완두콩" },
+      { id: 57, name: "고구마" }
+    ]
+  },
+  {
+    category: "첨가물",
+    items: [
+      { id: 58, name: "인공색소" },
+      { id: 59, name: "인공향료" },
+      { id: 60, name: "방부제" },
+      { id: 61, name: "BHA/BHT" },
+      { id: 62, name: "프로필렌 글리콜" },
+      { id: 63, name: "에톡시퀸" },
+      { id: 64, name: "MSG" },
+      { id: 65, name: "아황산염" },
+      { id: 66, name: "질산염" }
+    ]
+  }
+]
+
+const mockDiseases: DiseaseCategory[] = [
+  {
+    category: "소화기 질환",
+    items: [
+      { id: 1, name: "위염" },
+      { id: 2, name: "췌장염" },
+      { id: 3, name: "염증성 장질환" },
+      { id: 4, name: "대장염" },
+      { id: 5, name: "위 확장" },
+      { id: 6, name: "위 염전" },
+      { id: 7, name: "거대식도증" },
+      { id: 8, name: "간 질환" },
+      { id: 9, name: "담낭 질환" },
+      { id: 10, name: "변비" },
+      { id: 11, name: "설사" }
+    ]
+  },
+  {
+    category: "피부 질환",
+    items: [
+      { id: 12, name: "아토피 피부염" },
+      { id: 13, name: "벼룩 알레르기" },
+      { id: 14, name: "핫스팟" },
+      { id: 15, name: "효모 감염" },
+      { id: 16, name: "백선" },
+      { id: 17, name: "개선충증" },
+      { id: 18, name: "지루성 피부염" },
+      { id: 19, name: "핥는 육아종" },
+      { id: 20, name: "농피증" },
+      { id: 21, name: "탈모" },
+      { id: 22, name: "피부 종양" }
+    ]
+  },
+  {
+    category: "관절 및 뼈 질환",
+    items: [
+      { id: 23, name: "관절염" },
+      { id: 24, name: "고관절 이형성증" },
+      { id: 25, name: "십자인대 손상" },
+      { id: 26, name: "골관절염" },
+      { id: 27, name: "팔꿈치 이형성증" },
+      { id: 28, name: "슬개골 탈구" },
+      { id: 29, name: "골연골증" },
+      { id: 30, name: "추간판 질환" },
+      { id: 31, name: "워블러 증후군" },
+      { id: 32, name: "비대성 골이영양증" }
+    ]
+  },
+  {
+    category: "심장 및 호흡기 질환",
+    items: [
+      { id: 33, name: "심장 잡음" },
+      { id: 34, name: "울혈성 심부전" },
+      { id: 35, name: "확장성 심근병증" },
+      { id: 36, name: "승모판 질환" },
+      { id: 37, name: "심장사상충" },
+      { id: 38, name: "기관지염" },
+      { id: 39, name: "폐렴" },
+      { id: 40, name: "켄넬코프" },
+      { id: 41, name: "기관 허탈" },
+      { id: 42, name: "폐부종" }
+    ]
+  },
+  {
+    category: "신경 및 면역계 질환",
+    items: [
+      { id: 43, name: "간질" },
+      { id: 44, name: "전정기관 질환" },
+      { id: 45, name: "수막염" },
+      { id: 46, name: "뇌염" },
+      { id: 47, name: "자가면역 질환" },
+      { id: 48, name: "루푸스" },
+      { id: 49, name: "중증근무력증" },
+      { id: 50, name: "갑상선 기능저하증" },
+      { id: 51, name: "갑상선 기능항진증" },
+      { id: 52, name: "쿠싱병" },
+      { id: 53, name: "애디슨병" }
+    ]
+  },
+  {
+    category: "눈 및 귀 질환",
+    items: [
+      { id: 54, name: "백내장" },
+      { id: 55, name: "녹내장" },
+      { id: 56, name: "결막염" },
+      { id: 57, name: "진행성 망막위축" },
+      { id: 58, name: "체리아이" },
+      { id: 59, name: "귀 감염" },
+      { id: 60, name: "귀진드기" },
+      { id: 61, name: "청각 장애" },
+      { id: 62, name: "외이염" }
+    ]
+  },
+  {
+    category: "비뇨기 및 생식기 질환",
+    items: [
+      { id: 63, name: "요로 감염" },
+      { id: 64, name: "신장 질환" },
+      { id: 65, name: "방광 결석" },
+      { id: 66, name: "요실금" },
+      { id: 67, name: "전립선 문제" },
+      { id: 68, name: "자궁축농증" },
+      { id: 69, name: "유선 종양" },
+      { id: 70, name: "고환 종양" },
+      { id: 71, name: "잠복고환" }
+    ]
+  },
+  {
+    category: "기타 질환",
+    items: [
+      { id: 72, name: "당뇨병" },
+      { id: 73, name: "비만" },
+      { id: 74, name: "암" },
+      { id: 75, name: "빈혈" },
+      { id: 76, name: "치과 질환" },
+      { id: 77, name: "기생충" },
+      { id: 78, name: "라임병" },
+      { id: 79, name: "파보바이러스" },
+      { id: 80, name: "디스템퍼" },
+      { id: 81, name: "렙토스피라증" }
+    ]
+  }
+]
+
+// 저장된 반려견 정보 (Mock)
+let savedDogInfo: DogRegistrationResponse | null = null
+
+// 반려견 등록 API 함수들
+export const dogApi = {
+  // 품종 리스트 조회
+  getBreeds: async (): Promise<BreedOption[]> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return [...mockBreeds]
+  },
+
+  // 알레르기 리스트 조회
+  getAllergies: async (): Promise<AllergyCategory[]> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return [...mockAllergies]
+  },
+
+  // 질병 리스트 조회
+  getDiseases: async (): Promise<DiseaseCategory[]> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return [...mockDiseases]
+  },
+
+  // 반려견 등록
+  registerDog: async (dogData: DogRegistrationRequest): Promise<DogRegistrationResponse> => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // 품종 이름 찾기
+    const breed = mockBreeds.find(b => b.id === dogData.breed_id)
+    const breedName = breed ? breed.name : "알 수 없음"
+    
+    // 알레르기 이름들 찾기
+    const allergyNames: string[] = []
+    if (dogData.allergy_ids) {
+      dogData.allergy_ids.forEach((id: number) => {
+        mockAllergies.forEach(category => {
+          const allergyItem = category.items.find(item => item.id === id)
+          if (allergyItem) {
+            allergyNames.push(allergyItem.name)
+          }
+        })
+      })
+    }
+    
+    // 질병 이름들 찾기
+    const diseaseNames: string[] = []
+    if (dogData.disease_ids) {
+      dogData.disease_ids.forEach((id: number) => {
+        mockDiseases.forEach(category => {
+          const diseaseItem = category.items.find(item => item.id === id)
+          if (diseaseItem) {
+            diseaseNames.push(diseaseItem.name)
+          }
+        })
+      })
+    }
+    
+    const registeredDog: DogRegistrationResponse = {
+      id: Date.now(), // Mock ID generation
+      name: dogData.name,
+      birth_date: dogData.birth_date,
+      age_group: dogData.age_group,
+      weight: dogData.weight,
+      gender: dogData.gender,
+      medication: dogData.medication || null,
+      breed_name: breedName,
+      allergy_names: allergyNames,
+      disease_names: diseaseNames
+    }
+    
+    // Mock에서 저장
+    savedDogInfo = registeredDog
+    return registeredDog
+  },
+
+  // 반려견 정보 조회
+  getDogInfo: async (): Promise<DogRegistrationResponse | null> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    return savedDogInfo
+  },
+
+  // 반려견 정보 업데이트
+  updateDog: async (dogId: number, dogData: DogRegistrationRequest): Promise<DogRegistrationResponse> => {
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    if (!savedDogInfo || savedDogInfo.id !== dogId) {
+      throw new Error('Dog not found')
+    }
+    
+    // 품종 이름 찾기
+    const breed = mockBreeds.find(b => b.id === dogData.breed_id)
+    const breedName = breed ? breed.name : "알 수 없음"
+    
+    // 알레르기 이름들 찾기
+    const allergyNames: string[] = []
+    if (dogData.allergy_ids) {
+      dogData.allergy_ids.forEach((id: number) => {
+        mockAllergies.forEach(category => {
+          const allergyItem = category.items.find(item => item.id === id)
+          if (allergyItem) {
+            allergyNames.push(allergyItem.name)
+          }
+        })
+      })
+    }
+    
+    // 질병 이름들 찾기
+    const diseaseNames: string[] = []
+    if (dogData.disease_ids) {
+      dogData.disease_ids.forEach((id: number) => {
+        mockDiseases.forEach(category => {
+          const diseaseItem = category.items.find(item => item.id === id)
+          if (diseaseItem) {
+            diseaseNames.push(diseaseItem.name)
+          }
+        })
+      })
+    }
+    
+    const updatedDog: DogRegistrationResponse = {
+      id: dogId,
+      name: dogData.name,
+      birth_date: dogData.birth_date,
+      age_group: dogData.age_group,
+      weight: dogData.weight,
+      gender: dogData.gender,
+      medication: dogData.medication || null,
+      breed_name: breedName,
+      allergy_names: allergyNames,
+      disease_names: diseaseNames
+    }
+    
+    savedDogInfo = updatedDog
+    return updatedDog
+  },
+
+  // 반려견 정보 삭제
+  deleteDog: async (dogId: number): Promise<void> => {
+    await new Promise(resolve => setTimeout(resolve, 300))
+    if (savedDogInfo && savedDogInfo.id === dogId) {
+      savedDogInfo = null
     }
   }
 }
