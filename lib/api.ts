@@ -1006,9 +1006,13 @@ export interface WeeklyReportResponse {
   total_food_g: number
 }
 
-// API Base URL configuration - 로컬 테스트용으로 변경
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost'
+// API Base URL configuration - 환경변수로 관리
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL
 console.log('API_BASE_URL:', API_BASE_URL)
+
+if (!API_BASE_URL) {
+  console.error('⚠️ NEXT_PUBLIC_API_BASE_URL 환경변수가 설정되지 않았습니다!')
+}
 
 // 토큰 갱신 상태 관리
 let isRefreshing = false
@@ -1072,7 +1076,8 @@ const apiCall = async (endpoint: string, options: RequestInit = {}) => {
       }
   
   return fetch(`${API_BASE_URL}${endpoint}`, {
-    credentials: 'include', // 🔥 중요: 쿠키 자동 포함
+    credentials: 'include', // 🔥 중요: 쿠키 자동 포함 (CORS 설정 필요)
+    mode: 'cors', // CORS 모드 명시적 설정
     headers,
     ...options,
   })
