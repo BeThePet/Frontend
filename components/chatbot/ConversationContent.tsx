@@ -1,100 +1,232 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { ArrowLeft, Send, MapPin } from "lucide-react"
-
-interface Analysis {
-  possibleCauses: string[]
-  recommendation: string
-  emergency: boolean
-}
-
-interface Conversation {
-  isUser: boolean
-  message: string
-  isAnalysis?: boolean
-  analysis?: Analysis
-}
+import { ArrowLeft, Send, MapPin, Bot, User, Clock } from "lucide-react"
+import { useChatbot } from "@/hooks/useChatbot"
+import { Loading } from "@/components/ui/loading"
+import { ChatMessage } from "@/lib/types"
 
 export default function ConversationContent() {
-  const [mounted, setMounted] = useState(false)
-  const [conversations, setConversations] = useState<Conversation[]>([])
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const roomId = searchParams.get('roomId')
+
+  const {
+    currentRoom,
+    messages,
+    dogInfo,
+    isLoading,
+    isSending,
+    error,
+    chatState,
+    selectRoom,
+    sendMessage,
+    sendFirstMessage,
+    setError
+  } = useChatbot()
+
+  const [inputMessage, setInputMessage] = useState("")
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // 메시지 목록 자동 스크롤
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }
 
   useEffect(() => {
-    setMounted(true)
-    // 예시 대화 데이터 설정
-    setConversations([
-      {
-        isUser: true,
-        message: "우리 강아지가 기침을 해요. 어제부터 계속 기침을 하는데 걱정이 돼요.",
-      },
-      {
-        isUser: false,
-        message:
-          "안녕하세요! 강아지의 기침에 대해 걱정이 되시는군요. 기침의 빈도와 강도는 어떤가요? 그리고 다른 증상(콧물, 식욕 감소, 무기력함 등)도 함께 나타나고 있나요?",
-      },
-      {
-        isUser: true,
-        message: "하루에 5-6번 정도 기침을 하고, 콧물도 조금 있어요. 식욕은 평소와 비슷해요.",
-      },
-      {
-        isUser: false,
-        message:
-          "알려주셔서 감사합니다. 기침과 콧물이 함께 나타나는 것은 상부 호흡기 감염을 의심해볼 수 있어요. 강아지의 나이와 예방접종 상태는 어떻게 되나요?",
-        isAnalysis: false,
-      },
-      {
-        isUser: true,
-        message: "2살이고, 예방접종은 모두 완료했어요.",
-      },
-      {
-        isUser: false,
-        message: "증상 분석 결과",
-        isAnalysis: true,
-        analysis: {
-          possibleCauses: ["경미한 상부 호흡기 감염", "알레르기성 비염", "기관지염"],
-          recommendation:
-            "현재 증상은 심각해 보이지 않지만, 48시간 이상 지속된다면 수의사 진료를 권장합니다. 실내 습도를 높이고 먼지가 많은 환경은 피해주세요.",
-          emergency: false,
-        },
-      },
-    ])
-  }, [])
+    scrollToBottom()
+  }, [messages])
 
-  if (!mounted) return null
+  // roomId가 변경되거나 초기 로드 시 대화방 선택
+  useEffect(() => {
+    if (roomId && currentRoom?.id !== roomId) {
+      // 임시 방 객체를 생성하여 selectRoom 호출
+      const tempRoom = {
+        id: roomId,
+        user_id: 0,
+        title: "",
+        created_at: "",
+        updated_at: "",
+        deleted_at: null
+      }
+      selectRoom(tempRoom)
+    }
+  }, [roomId, currentRoom?.id, selectRoom])
+
+  // roomId가 없으면 메인 페이지로 리다이렉트
+  useEffect(() => {
+    if (!roomId) {
+      router.push('/chatbot')
+    }
+  }, [roomId, router])
+
+  const handleSendMessage = async () => {
+    if (!roomId || !inputMessage.trim() || isSending) return
+
+    const messageContent = inputMessage.trim()
+    setInputMessage("")
+
+    try {
+      if (messages.length === 0) {
+        // 첫 메시지인 경우
+        await sendFirstMessage(roomId, messageContent)
+      } else {
+        // 일반 메시지인 경우
+        await sendMessage(roomId, messageContent)
+      }
+      
+      // 입력창에 포커스 유지
+      setTimeout(() => {
+        inputRef.current?.focus()
+      }, 100)
+    } catch (error) {
+      // 에러 발생 시 입력값 복원
+      setInputMessage(messageContent)
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
+  if (!roomId) {
+    return <Loading />
+  }
+
+  if (isLoading && !currentRoom) {
+    return (
+      <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+        <Loading />
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-[#FFF8F0] flex flex-col">
-      <div className="bg-[#FBD6E4] p-4 flex items-center">
-        <Link href="/chatbot" className="text-gray-800">
+      {/* 헤더 */}
+      <div className="bg-[#FBD6E4] p-4 flex items-center shadow-sm">
+        <Link href="/chatbot" className="text-gray-800 hover:text-gray-600">
           <ArrowLeft className="w-6 h-6" />
         </Link>
-        <h1 className="text-xl font-bold text-gray-800 ml-4">멍멍 상담사와의 대화</h1>
-      </div>
-
-      <div className="flex-1 p-5 flex flex-col">
-        {/* 대화 내용 */}
-        <div className="flex-1 space-y-4 mb-4 overflow-y-auto">
-          {conversations.map((conv, index) =>
-            conv.isAnalysis && conv.analysis ? (
-              <AnalysisMessage key={index} analysis={conv.analysis} />
-            ) : (
-              <ChatMessage key={index} message={conv.message} isUser={conv.isUser} />
-            ),
+        <div className="ml-4 flex-1">
+          <h1 className="text-lg font-bold text-gray-800">
+            {currentRoom?.title || "멍멍 상담사와의 대화"}
+          </h1>
+          {dogInfo && (
+            <p className="text-sm text-gray-600">
+              {dogInfo.name} ({dogInfo.breed}, {dogInfo.age})
+            </p>
           )}
         </div>
+        {isSending && (
+          <div className="flex items-center text-sm text-gray-600">
+            <Clock className="w-4 h-4 mr-1 animate-pulse" />
+            답변 중...
+          </div>
+        )}
+      </div>
 
-        {/* 채팅 입력 */}
-        <div className="mt-auto">
+      {/* 에러 메시지 */}
+      {error && (
+        <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700">
+          {error}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setError(null)}
+            className="ml-2 text-red-700 hover:text-red-800"
+          >
+            ✕
+          </Button>
+        </div>
+      )}
+
+      {/* 메시지 영역 */}
+      <div className="flex-1 p-4 overflow-y-auto">
+        {messages.length === 0 ? (
+          <div className="text-center py-8">
+            <Bot className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500 mb-2">안녕하세요! 멍멍 상담사입니다</p>
+            <p className="text-sm text-gray-400">반려견의 증상이나 궁금한 점을 말씀해주세요</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-w-4xl mx-auto">
+            {messages.map((message, index) => (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isConsecutive={
+                  index > 0 && 
+                  messages[index - 1].role === message.role &&
+                  new Date(message.created_at).getTime() - new Date(messages[index - 1].created_at).getTime() < 60000
+                }
+              />
+            ))}
+            
+            {/* 로딩 상태 표시 */}
+            {isSending && (
+              <div className="flex justify-start">
+                <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm">
+                  <Bot className="w-5 h-5 text-[#FBD6E4] mr-2" />
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* 입력 영역 */}
+      <div className="p-4 bg-white border-t border-gray-200">
+        <div className="max-w-4xl mx-auto">
+          {/* 대화 상태 안내 메시지 */}
+          {chatState === 'waiting_for_additional' && (
+            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-700">
+                💡 <strong>추가 증상이나 상태를 알려주세요!</strong>
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                더 정확한 진단을 위해 추가 증상이나 행동 변화를 설명해주세요. 없으시면 '없음'이라고 입력해주세요.
+              </p>
+            </div>
+          )}
+          
           <div className="relative">
-            <Input placeholder="질문을 입력해주세요" className="pr-12 rounded-full border-gray-300" />
+            <Input
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder={
+                chatState === 'waiting_for_additional'
+                  ? "추가 증상을 설명해주세요 (없으면 '없음'이라고 입력)"
+                  : messages.length === 0 
+                    ? "증상을 자세히 설명해주세요" 
+                    : "추가 정보나 질문을 입력하세요"
+              }
+              className="pr-12 rounded-full border-gray-300 py-3"
+              disabled={isSending}
+            />
             <Button
+              onClick={handleSendMessage}
+              disabled={!inputMessage.trim() || isSending}
               size="icon"
-              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 rounded-full bg-[#FBD6E4] hover:bg-[#f5c0d5]"
+              className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 rounded-full bg-[#FBD6E4] hover:bg-[#f5c0d5] disabled:opacity-50"
             >
               <Send className="w-4 h-4 text-gray-800" />
             </Button>
@@ -105,58 +237,153 @@ export default function ConversationContent() {
   )
 }
 
-function ChatMessage({ message, isUser }: { message: string; isUser: boolean }) {
+function MessageBubble({ 
+  message, 
+  isConsecutive 
+}: { 
+  message: ChatMessage
+  isConsecutive: boolean 
+}) {
+  const isUser = message.role === 'user'
+  
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    })
+  }
+
+  // 동물병원 찾기 함수
+  const handleFindHospital = () => {
+    if ('geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords
+          // 현재 위치 기반 구글 지도 검색
+          window.open(`https://www.google.com/maps/search/동물병원/@${latitude},${longitude},15z`, '_blank')
+        },
+        (error) => {
+          console.log('위치 정보를 가져올 수 없습니다:', error)
+          // 위치 정보가 없을 때 기본 검색
+          window.open('https://www.google.com/maps/search/동물병원+near+me', '_blank')
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 300000 // 5분간 캐시
+        }
+      )
+    } else {
+      // Geolocation을 지원하지 않는 경우 기본 검색
+      window.open('https://www.google.com/maps/search/동물병원+near+me', '_blank')
+    }
+  }
+
+  const parseAIMessage = (content: string) => {
+    // AI 메시지의 마크다운 스타일 파싱
+    const lines = content.split('\n')
+    const parsed = []
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]
+      
+      if (line.startsWith('**') && line.endsWith('**')) {
+        // 볼드 텍스트
+        parsed.push({
+          type: 'heading',
+          content: line.slice(2, -2)
+        })
+      } else if (line.startsWith('- ')) {
+        // 리스트 아이템
+        parsed.push({
+          type: 'list',
+          content: line.slice(2)
+        })
+      } else if (line.startsWith('🔍') || line.startsWith('💬') || line.startsWith('💡')) {
+        // 이모지로 시작하는 섹션
+        parsed.push({
+          type: 'section',
+          content: line
+        })
+      } else if (line.trim()) {
+        // 일반 텍스트
+        parsed.push({
+          type: 'text',
+          content: line
+        })
+      }
+    }
+    
+    return parsed
+  }
+  
+  const parsedContent = isUser ? null : parseAIMessage(message.content)
+
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-      <div
-        className={`max-w-[80%] rounded-2xl p-3 ${
-          isUser ? "bg-[#FBD6E4] text-gray-800" : "bg-white border border-gray-200 text-gray-700"
-        }`}
-      >
-        <p className="text-sm">{message}</p>
-      </div>
-    </div>
-  )
-}
-
-function AnalysisMessage({ analysis }: { analysis: Analysis }) {
-  return (
-    <Card className="bg-white border-[#D6ECFA] rounded-xl shadow-sm">
-      <CardContent className="p-4">
-        <h3 className="font-semibold text-gray-800 mb-2">증상 분석 결과</h3>
-
-        <div className="mb-3">
-          <h4 className="text-sm font-medium text-gray-700 mb-1">가능성 있는 원인:</h4>
-          <ul className="text-sm text-gray-600 pl-5 list-disc">
-            {analysis.possibleCauses.map((cause: string, index: number) => (
-              <li key={index}>{cause}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="mb-3">
-          <h4 className="text-sm font-medium text-gray-700 mb-1">권장 사항:</h4>
-          <p className="text-sm text-gray-600">{analysis.recommendation}</p>
-        </div>
-
-        {analysis.emergency && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex items-start">
-            <div className="text-red-600 mr-2 mt-0.5">⚠️</div>
-            <div>
-              <h4 className="text-sm font-medium text-red-700">긴급 안내</h4>
-              <p className="text-xs text-red-600">즉시 수의사의 진료가 필요합니다.</p>
-            </div>
+      <div className={`max-w-[80%] ${isUser ? "order-2" : "order-1"}`}>
+        {/* 아바타 및 시간 */}
+        {!isConsecutive && (
+          <div className={`flex items-center mb-1 ${isUser ? "justify-end" : "justify-start"}`}>
+            {!isUser && <Bot className="w-4 h-4 text-[#FBD6E4] mr-2" />}
+            <span className="text-xs text-gray-500">
+              {formatTimestamp(message.created_at)}
+            </span>
+            {isUser && <User className="w-4 h-4 text-gray-500 ml-2" />}
           </div>
         )}
-
-        <Button
-          variant="outline"
-          className="w-full mt-3 rounded-lg border-[#D6ECFA] text-gray-700 flex items-center justify-center gap-2"
+        
+        {/* 메시지 버블 */}
+        <div
+          className={`rounded-2xl p-4 shadow-sm ${
+            isUser 
+              ? "bg-[#FBD6E4] text-gray-800" 
+              : "bg-white border border-gray-200 text-gray-700"
+          } ${isConsecutive ? "mt-1" : ""}`}
         >
-          <MapPin className="w-4 h-4" />
-          <span>가까운 동물병원 찾기</span>
-        </Button>
-      </CardContent>
-    </Card>
+          {isUser ? (
+            <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+          ) : (
+            <div className="space-y-2">
+              {parsedContent?.map((item, index) => (
+                <div key={index}>
+                  {item.type === 'heading' && (
+                    <h4 className="font-semibold text-gray-800 text-sm">{item.content}</h4>
+                  )}
+                  {item.type === 'section' && (
+                    <p className="font-medium text-gray-800 text-sm">{item.content}</p>
+                  )}
+                  {item.type === 'list' && (
+                    <p className="text-sm text-gray-600 ml-4">• {item.content}</p>
+                  )}
+                  {item.type === 'text' && (
+                    <p className="text-sm text-gray-600">{item.content}</p>
+                  )}
+                </div>
+              )) || (
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              )}
+              
+              {/* 병원 찾기 버튼 (특정 키워드가 포함된 경우) */}
+              {(message.content.includes('수의사') || 
+                message.content.includes('병원') || 
+                message.content.includes('권장사항') ||
+                message.content.includes('상담')) && (
+                <Button
+                  variant="outline"
+                  onClick={handleFindHospital}
+                  className="w-full mt-3 rounded-lg border-[#D6ECFA] text-gray-700 flex items-center justify-center gap-2 text-sm hover:bg-blue-50 transition-colors"
+                >
+                  <MapPin className="w-4 h-4" />
+                  <span>가까운 동물병원 찾기</span>
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   )
 } 

@@ -1,17 +1,20 @@
 "use client"
 
-import dynamic from 'next/dynamic'
-
-// 클라이언트 사이드에서만 로드되도록 동적 임포트
-const AIAssistantContent = dynamic(() => import('@/components/ai-assistant/AIAssistantContent'), {
-  ssr: false,
-  loading: () => (
-    <div className="min-h-screen bg-beige flex justify-center items-center">
-      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
-    </div>
-  )
-})
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loading } from '@/components/ui/loading'
 
 export default function AIAssistantPage() {
-  return <AIAssistantContent />
+  const router = useRouter()
+
+  useEffect(() => {
+    // AI 어시스턴트 페이지는 챗봇 페이지로 리다이렉트
+    router.replace('/chatbot')
+  }, [router])
+
+  return (
+    <div className="min-h-screen bg-[#FFF8F0] flex items-center justify-center">
+      <Loading />
+    </div>
+  )
 }

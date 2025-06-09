@@ -1797,3 +1797,130 @@ export const healthApi = {
     return response.json()
   }
 }
+
+// Chatbot 관련 API 함수들
+export const chatbotApi = {
+  // 대화방 목록 조회
+  getRooms: async () => {
+    const response = await apiCallWithRetry('/chatbot/rooms', {
+      method: 'GET',
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      throw new Error('Failed to fetch chat rooms')
+    }
+    
+    return response.json()
+  },
+
+  // 새 대화방 생성
+  createRoom: async (title?: string) => {
+    const response = await apiCallWithRetry('/chatbot/rooms', {
+      method: 'POST',
+      body: JSON.stringify(title ? { title } : {}),
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      throw new Error('Failed to create chat room')
+    }
+    
+    return response.json()
+  },
+
+  // 대화방 삭제
+  deleteRoom: async (roomId: string) => {
+    const response = await apiCallWithRetry(`/chatbot/rooms/${roomId}`, {
+      method: 'DELETE',
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('대화방을 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to delete chat room')
+    }
+    
+    return response.json()
+  },
+
+  // 대화 히스토리 조회
+  getMessages: async (roomId: string) => {
+    const response = await apiCallWithRetry(`/chatbot/rooms/${roomId}/messages`, {
+      method: 'GET',
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('대화방을 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to fetch messages')
+    }
+    
+    return response.json()
+  },
+
+  // 첫 메시지 전송 (대화 시작)
+  sendFirstMessage: async (roomId: string, content: string) => {
+    const response = await apiCallWithRetry(`/chatbot/rooms/${roomId}/messages/first`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('대화방을 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to send first message')
+    }
+    
+    return response.json()
+  },
+
+  // 일반 메시지 전송
+  sendMessage: async (roomId: string, content: string) => {
+    const response = await apiCallWithRetry(`/chatbot/rooms/${roomId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ content }),
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('대화방을 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to send message')
+    }
+    
+    return response.json()
+  },
+
+  // 챗봇 헬스체크
+  healthCheck: async () => {
+    const response = await apiCallWithRetry('/chatbot/health', {
+      method: 'GET',
+    })
+    
+    if (!response.ok) {
+      throw new Error('Chatbot service is not healthy')
+    }
+    
+    return response.json()
+  },
+}
