@@ -156,6 +156,7 @@ export interface DogRegistrationResponse {
   weight: number
   gender: "남아" | "여아" | "중성화"
   medication?: string | null
+  profile_image_url?: string | null  // 프로필 이미지 URL
   breed_name: string
   allergy_names: string[]
   disease_names: string[]
@@ -850,6 +851,69 @@ export const dogApi = {
     if (!response.ok) {
       throw new Error('Failed to delete dog')
     }
+  },
+
+  // 반려견 프로필 이미지 업로드 (첫 업로드)
+  uploadDogImage: async (file: File): Promise<{ profile_image_url: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await apiCallWithRetry('/dog-image/', {
+      method: 'POST',
+      body: formData,
+      // multipart/form-data는 브라우저가 자동으로 Content-Type 설정
+      headers: {} // Content-Type 헤더를 명시적으로 설정하지 않음
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to upload image')
+    }
+    
+    return response.json()
+  },
+
+  // 반려견 프로필 이미지 교체
+  updateDogImage: async (file: File): Promise<{ profile_image_url: string }> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    
+    const response = await apiCallWithRetry('/dog-image/', {
+      method: 'PUT',
+      body: formData,
+      headers: {}
+    })
+    
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.detail || 'Failed to update image')
+    }
+    
+    return response.json()
+  },
+
+  // 반려견 프로필 이미지 URL 조회
+  getDogImageUrl: async (): Promise<{ profile_image_url: string | null }> => {
+    const response = await apiCallWithRetry('/dog-image/', {
+      method: 'GET',
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to get dog image URL')
+    }
+    
+    return response.json()
+  },
+
+  // 반려견 프로필 이미지 삭제
+  deleteDogImage: async (): Promise<void> => {
+    const response = await apiCallWithRetry('/dog-image/', {
+      method: 'DELETE',
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to delete dog image')
+    }
   }
 }
 
@@ -996,12 +1060,20 @@ const getAuthHeaders = () => {
 // Cookie-based fetch wrapper
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
   console.log(`API 호출: ${API_BASE_URL}${endpoint}`)
+  
+  // FormData인 경우 Content-Type을 설정하지 않음 (브라우저가 자동 설정)
+  const isFormData = options.body instanceof FormData
+  
+  const headers: HeadersInit = isFormData 
+    ? { ...options.headers } // FormData일 때는 Content-Type 없음
+    : {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      }
+  
   return fetch(`${API_BASE_URL}${endpoint}`, {
     credentials: 'include', // 🔥 중요: 쿠키 자동 포함
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
     ...options,
   })
 }

@@ -14,6 +14,8 @@ export default function PetDetailContent() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [petInfo, setPetInfo] = useState<any>(null)
+  const [petProfileImageUrl, setPetProfileImageUrl] = useState<string>("")
+  const [imageLoadError, setImageLoadError] = useState(false)
   const [breeds, setBreeds] = useState<BreedOption[]>([])
   const [allergyCategories, setAllergyCategories] = useState<AllergyCategory[]>([])
   const [diseaseCategories, setDiseaseCategories] = useState<DiseaseCategory[]>([])
@@ -23,9 +25,12 @@ export default function PetDetailContent() {
       try {
         setLoading(true)
         
-        // 1순위: 백엔드에서 반려견 정보 가져오기
+        // 1순위: 백엔드에서 반려견 정보와 이미지를 병렬로 가져오기
         try {
-          const dogInfo = await dogApi.getDogInfo()
+          const [dogInfo, imageInfo] = await Promise.all([
+            dogApi.getDogInfo(),
+            dogApi.getDogImageUrl().catch(() => ({ profile_image_url: null }))
+          ])
           if (dogInfo) {
             // 백엔드 응답을 프론트엔드 형태로 변환
             const petData = {
@@ -44,6 +49,10 @@ export default function PetDetailContent() {
               disease_names: dogInfo.disease_names
             }
             setPetInfo(petData)
+            
+            // 프로필 이미지 URL 설정 (API 응답 우선, 없으면 dogInfo에서)
+            setPetProfileImageUrl(imageInfo.profile_image_url || dogInfo.profile_image_url || "")
+            setImageLoadError(false) // 이미지 에러 상태 리셋
             
             // 백엔드 데이터를 localStorage에도 백업 저장
             localStorage.setItem('registeredPetInfo', JSON.stringify(petData))
@@ -108,6 +117,18 @@ export default function PetDetailContent() {
     return `${age}살`
   }
 
+  const formatBirthday = (birthday: string) => {
+    if (!birthday) return '정보 없음'
+
+    const date = new Date(birthday)
+    const year = date.getFullYear()
+    const month = date.getMonth() + 1
+    const day = date.getDate()
+
+
+    return `${year.toString().slice(-2)}.${month.toString().padStart(2, '0')}.${day.toString().padStart(2, '0')}`
+  }
+
   const handleEdit = () => {
     router.push('/info?mode=edit')
   }
@@ -167,7 +188,7 @@ export default function PetDetailContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-beige flex justify-center items-center">
+      <div className="min-h-screen bg-pink-50 flex justify-center items-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
       </div>
     )
@@ -175,7 +196,7 @@ export default function PetDetailContent() {
 
   if (!petInfo) {
     return (
-      <div className="min-h-screen bg-beige flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-pink-50 flex flex-col items-center justify-center p-6">
         <div className="text-center">
           <Dog className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-bold text-gray-800 mb-2">반려견 정보가 없습니다</h2>
@@ -189,7 +210,7 @@ export default function PetDetailContent() {
   }
 
   return (
-    <div className="min-h-screen bg-beige">
+    <div className="min-h-screen bg-pink-50">
       {/* 헤더 */}
       <div className="bg-pink-200 p-4 flex items-center justify-between">
         <div className="flex items-center">
@@ -231,59 +252,73 @@ export default function PetDetailContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center">
-                {petInfo.photoUrl ? (
+              <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200 shadow-lg">
+                {petProfileImageUrl && !imageLoadError ? (
                   <Image
-                    src={petInfo.photoUrl}
+                    src={petProfileImageUrl}
                     alt={petInfo.name}
-                    width={80}
-                    height={80}
+                    width={96}
+                    height={96}
                     className="rounded-full object-cover w-full h-full"
+                    onError={() => setImageLoadError(true)}
                   />
                 ) : (
-                  <Dog className="w-10 h-10 text-pink-400" />
+                  <Dog className="w-12 h-12 text-pink-400" />
                 )}
               </div>
-              <div>
-                <h3 className="text-xl font-bold text-gray-800">{petInfo.name}</h3>
-                <p className="text-gray-600">{getBreedName(petInfo.breedId)}</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">나이</p>
-                  <p className="font-medium">{calculateAge(petInfo.birthday)}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <User className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">성별</p>
-                  <p className="font-medium">{petInfo.gender}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Scale className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">체중</p>
-                  <p className="font-medium">{petInfo.weight ? `${petInfo.weight}kg` : '정보 없음'}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Heart className="w-4 h-4 text-gray-400" />
-                <div>
-                  <p className="text-sm text-gray-500">연령대</p>
-                  <p className="font-medium">{petInfo.ageGroup || '정보 없음'}</p>
+              <div className="flex-1">
+                <h3 className="text-2xl font-bold text-gray-800 mb-1">{petInfo.name}</h3>
+                <p className="text-gray-600 mb-2">{petInfo.breed || getBreedName(petInfo.breedId)}</p>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="bg-pink-50 text-pink-700 border-pink-200">
+                    {petInfo.ageGroup}
+                  </Badge>
+                  <Badge variant="outline" className="text-gray-600">
+                    {calculateAge(petInfo.birthday)}
+                  </Badge>
                 </div>
               </div>
             </div>
 
-            <div>
-              <p className="text-sm text-gray-500 mb-1">생일</p>
-              <p className="font-medium">{petInfo.birthday || '정보 없음'}</p>
+            <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-pink-100 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-pink-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">성별</p>
+                  <p className="font-medium text-gray-800">
+                    {petInfo.gender === "남아" ? "♂ 남아" : petInfo.gender === "여아" ? "♀ 여아" : petInfo.gender}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Scale className="w-4 h-4 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">체중</p>
+                  <p className="font-medium text-gray-800">{petInfo.weight ? `${petInfo.weight}kg` : '정보 없음'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <Calendar className="w-4 h-4 text-green-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">생일</p>
+                  <p className="font-medium text-gray-800 text-sm">{formatBirthday(petInfo.birthday)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <Heart className="w-4 h-4 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">연령대</p>
+                  <p className="font-medium text-gray-800">{petInfo.ageGroup || '정보 없음'}</p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
@@ -301,8 +336,8 @@ export default function PetDetailContent() {
             <div>
               <p className="text-sm text-gray-500 mb-2">알레르기</p>
               <div className="flex flex-wrap gap-1">
-                {petInfo.allergyIds && petInfo.allergyIds.length > 0 ? (
-                  getAllergyNames(petInfo.allergyIds).map((name, index) => (
+                {petInfo.allergy_names && petInfo.allergy_names.length > 0 ? (
+                  petInfo.allergy_names.map((name: string, index: number) => (
                     <Badge key={index} variant="secondary" className="bg-red-50 text-red-700 border-red-200">
                       {name}
                     </Badge>
@@ -317,8 +352,8 @@ export default function PetDetailContent() {
             <div>
               <p className="text-sm text-gray-500 mb-2">질병 이력</p>
               <div className="flex flex-wrap gap-1">
-                {petInfo.diseaseIds && petInfo.diseaseIds.length > 0 ? (
-                  getDiseaseNames(petInfo.diseaseIds).map((name, index) => (
+                {petInfo.disease_names && petInfo.disease_names.length > 0 ? (
+                  petInfo.disease_names.map((name: string, index: number) => (
                     <Badge key={index} variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
                       {name}
                     </Badge>
@@ -330,17 +365,24 @@ export default function PetDetailContent() {
             </div>
 
             {/* 현재 복용약 */}
-            {petInfo.medicine && (
-              <div>
-                <p className="text-sm text-gray-500 mb-2">현재 복용약</p>
-                <div className="p-3 bg-gray-50 rounded-lg">
-                  <p className="text-sm">{petInfo.medicine}</p>
+            <div>
+              <p className="text-sm text-gray-500 mb-2 flex items-center gap-2">
+                <Pill className="w-4 h-4" />
+                현재 복용약
+              </p>
+              {petInfo.medicine ? (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <p className="text-sm text-amber-800">{petInfo.medicine}</p>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-500">현재 복용 중인 약이 없습니다.</p>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
     </div>
   )
-} 
+}

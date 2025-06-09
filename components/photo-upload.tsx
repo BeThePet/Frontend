@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Camera, Upload, X } from "lucide-react"
@@ -13,12 +13,20 @@ interface PhotoUploadProps {
   onImageChange?: (file: File | null) => void
   className?: string
   size?: "sm" | "md" | "lg"
+  uploadedImageUrl?: string
 }
 
-export default function PhotoUpload({ initialImage, onImageChange, className = "", size = "md" }: PhotoUploadProps) {
+export default function PhotoUpload({ initialImage, onImageChange, className = "", size = "md", uploadedImageUrl }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(initialImage || null)
   const [isLoading, setIsLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // S3 업로드가 완료되면 업로드된 URL로 미리보기 업데이트
+  useEffect(() => {
+    if (uploadedImageUrl) {
+      setPreview(uploadedImageUrl)
+    }
+  }, [uploadedImageUrl])
 
   const sizes = {
     sm: "w-20 h-20",
@@ -32,13 +40,14 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
 
     setIsLoading(true)
 
-    const reader = new FileReader()
-    reader.onloadend = () => {
-      setPreview(reader.result as string)
-      if (onImageChange) onImageChange(file)
-      setIsLoading(false)
-    }
-    reader.readAsDataURL(file)
+    // S3 업로드를 위해 미리보기는 로컬 URL로 생성
+    const localPreviewUrl = URL.createObjectURL(file)
+    setPreview(localPreviewUrl)
+    
+    // 부모 컴포넌트에서 실제 S3 업로드 처리
+    if (onImageChange) onImageChange(file)
+    
+    setIsLoading(false)
   }
 
   const handleRemoveImage = () => {

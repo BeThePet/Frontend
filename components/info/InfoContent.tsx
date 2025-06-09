@@ -26,6 +26,7 @@ export default function InfoContent() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [isEditMode, setIsEditMode] = useState(false)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
   
   // API에서 받아온 데이터
   const [breeds, setBreeds] = useState<BreedOption[]>([])
@@ -41,9 +42,12 @@ export default function InfoContent() {
     weight: "",
     ageGroup: "성견" as "주니어" | "성견" | "시니어",
     medicine: "",
-    photoUrl: "",
     neutered: null as boolean | null,
   })
+  
+  // 이미지 상태는 별도 관리
+  const [profileImageUrl, setProfileImageUrl] = useState<string>("")
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
 
   // 알레르기 상태 (이제 ID 기반)
   const [selectedAllergies, setSelectedAllergies] = useState<Set<number>>(new Set())
@@ -99,7 +103,10 @@ export default function InfoContent() {
         if (mode === 'edit') {
           try {
             // 실제 백엔드에서 반려견 정보 가져오기
-            const dogInfo = await dogApi.getDogInfo()
+            const [dogInfo, imageInfo] = await Promise.all([
+              dogApi.getDogInfo(),
+              dogApi.getDogImageUrl().catch(() => ({ profile_image_url: null }))
+            ])
             
             if (dogInfo) {
               // 백엔드 응답을 프론트엔드 폼 데이터로 변환
@@ -111,9 +118,11 @@ export default function InfoContent() {
                 weight: dogInfo.weight?.toString() || "",
                 ageGroup: dogInfo.age_group || "성견",
                 medicine: dogInfo.medication || "",
-                photoUrl: "", // 추후 photo_url 필드 추가 시 사용
                 neutered: null,
               })
+              
+              // 프로필 이미지 URL 별도 설정 (API 응답 우선, 없으면 dogInfo에서)
+              setProfileImageUrl(imageInfo.profile_image_url || dogInfo.profile_image_url || "")
               
               // breed_name을 통해 breed_id 찾기
               let foundBreed: BreedOption | undefined = undefined
@@ -190,9 +199,11 @@ export default function InfoContent() {
                 weight: existingDogInfo.weight?.toString() || "",
                 ageGroup: existingDogInfo.ageGroup || "성견",
                 medicine: existingDogInfo.medicine || "",
-                photoUrl: existingDogInfo.photoUrl || "",
                 neutered: existingDogInfo.neutered || null,
               })
+              
+              // 프로필 이미지 URL 별도 설정
+              setProfileImageUrl(existingDogInfo.photoUrl || "")
               
               // 알레르기와 질병 ID 복원
               if (existingDogInfo.allergyIds) {
@@ -268,15 +279,82 @@ export default function InfoContent() {
     setPetInfo((prev) => ({ ...prev, breedId }))
   }
 
-  const handleImageChange = (file: File | null) => {
+    const handleImageChange = (file: File | null) => {
     if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPetInfo((prev) => ({ ...prev, photoUrl: reader.result as string }))
+      // 파일 크기 체크 (5MB 제한)
+      const maxSize = 5 * 1024 * 1024 // 5MB
+      if (file.size > maxSize) {
+        toast({
+          title: "파일 크기 초과",
+          description: "이미지 파일은 5MB 이하만 업로드 가능합니다.",
+          variant: "destructive",
+        })
+        return
       }
-      reader.readAsDataURL(file)
+      
+      // 파일 타입 체크
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+      if (!allowedTypes.includes(file.type)) {
+        toast({
+          title: "지원하지 않는 파일 형식",
+          description: "JPG, PNG, WEBP 형식의 이미지만 업로드 가능합니다.",
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // 수정 모드면 즉시 업로드, 등록 모드면 pending으로 저장
+      if (isEditMode) {
+        uploadImageImmediately(file)
+      } else {
+        setPendingImageFile(file)
+        // 미리보기를 위한 로컬 URL 생성
+        const localPreviewUrl = URL.createObjectURL(file)
+        setProfileImageUrl(localPreviewUrl)
+      }
     } else {
-      setPetInfo((prev) => ({ ...prev, photoUrl: "" }))
+      setProfileImageUrl("")
+      setPendingImageFile(null)
+    }
+  }
+
+  const uploadImageImmediately = async (file: File) => {
+    try {
+      setIsUploadingImage(true)
+      console.log("이미지 업로드 시작:", file.name)
+      
+      // 백엔드에 이미지 업로드 (첫 업로드 시도)
+      let uploadResult
+      try {
+        uploadResult = await dogApi.uploadDogImage(file)
+      } catch (error: any) {
+        // 이미 이미지가 있으면 PUT으로 교체
+        if (error.message.includes('이미 프로필 이미지가 존재합니다')) {
+          uploadResult = await dogApi.updateDogImage(file)
+        } else {
+          throw error
+        }
+      }
+      
+      // S3 URL을 별도 상태에 저장
+      setProfileImageUrl(uploadResult.profile_image_url)
+      
+      toast({
+        title: "이미지 업로드 완료",
+        description: "반려견 사진이 성공적으로 업로드되었습니다.",
+      })
+      
+      console.log("이미지 업로드 성공:", uploadResult.profile_image_url)
+      
+    } catch (error) {
+      console.error("이미지 업로드 실패:", error)
+      toast({
+        title: "이미지 업로드 실패",
+        description: "이미지 업로드 중 오류가 발생했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingImage(false)
     }
   }
 
@@ -365,6 +443,20 @@ export default function InfoContent() {
         localStorage.setItem('registeredPetInfo', JSON.stringify(savedInfo))
       }
       
+      // 등록 모드이고 대기 중인 이미지가 있으면 업로드
+      if (!isEditMode && pendingImageFile) {
+        try {
+          console.log("반려견 등록 완료 후 이미지 업로드 시작")
+          const uploadResult = await dogApi.uploadDogImage(pendingImageFile)
+          setProfileImageUrl(uploadResult.profile_image_url)
+          setPendingImageFile(null)
+          console.log("이미지 업로드도 완료:", uploadResult.profile_image_url)
+        } catch (error) {
+          console.error("이미지 업로드 실패 (반려견 등록은 완료됨):", error)
+          // 이미지 업로드 실패해도 등록은 완료되었으므로 성공 메시지 표시
+        }
+      }
+
       // 성공 메시지 표시
       toast({
         title: isEditMode ? "수정 완료!" : "등록 완료!",
@@ -375,7 +467,7 @@ export default function InfoContent() {
       setTimeout(() => {
         setIsSubmitting(false)
         router.push("/dashboard")
-      }, 1000)
+      }, 1500) // 이미지 업로드 시간 고려하여 조금 더 길게
       
     } catch (error) {
       console.error("반려견 등록 실패:", error)
@@ -425,8 +517,22 @@ export default function InfoContent() {
             <TabsContent value="basic" className="mt-4 space-y-5">
               {/* 사진 업로드 */}
               <div className="flex justify-center mb-4">
-                <PhotoUpload size="lg" initialImage={petInfo.photoUrl} onImageChange={handleImageChange} />
+                <PhotoUpload 
+                  size="lg" 
+                  initialImage={profileImageUrl} 
+                  onImageChange={handleImageChange}
+                  uploadedImageUrl={profileImageUrl}
+                />
               </div>
+              
+              {(isUploadingImage || (isSubmitting && pendingImageFile)) && (
+                <div className="text-center text-sm text-gray-600 mb-4">
+                  <div className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-pink-500"></div>
+                    {isUploadingImage ? "이미지 업로드 중..." : "반려견 등록 후 이미지 업로드 중..."}
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>

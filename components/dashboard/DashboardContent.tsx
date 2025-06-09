@@ -36,6 +36,8 @@ export default function DashboardContent() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [petInfo, setPetInfo] = useState<any>(null)
+  const [petProfileImageUrl, setPetProfileImageUrl] = useState<string>("")
+  const [imageLoadError, setImageLoadError] = useState(false)
   const [healthData, setHealthData] = useState<any>(null)
   const [medications, setMedications] = useState<MedicationResponse[]>([])
   const [todayChecked, setTodayChecked] = useState(false)
@@ -65,7 +67,12 @@ export default function DashboardContent() {
         // 반려견 정보 불러오기 (백엔드 API 우선, localStorage 백업)
         if (userLoggedIn) {
           try {
-            const dogInfo = await dogApi.getDogInfo()
+            // 반려견 정보와 이미지를 병렬로 가져오기
+            const [dogInfo, imageInfo] = await Promise.all([
+              dogApi.getDogInfo(),
+              dogApi.getDogImageUrl().catch(() => ({ profile_image_url: null }))
+            ])
+            
             if (dogInfo) {
               // 백엔드 응답을 프론트엔드 형태로 변환
               const petData = {
@@ -82,6 +89,10 @@ export default function DashboardContent() {
                 disease_names: dogInfo.disease_names
               }
               setPetInfo(petData)
+              
+              // 프로필 이미지 URL 설정 (API 응답 우선, 없으면 dogInfo에서)
+              setPetProfileImageUrl(imageInfo.profile_image_url || dogInfo.profile_image_url || "")
+              setImageLoadError(false) // 이미지 에러 상태 리셋
               
               // 백엔드 데이터를 localStorage에도 백업 저장
               localStorage.setItem('registeredPetInfo', JSON.stringify(petData))
@@ -434,26 +445,38 @@ export default function DashboardContent() {
         {/* 반려견 프로필 카드 */}
         {petInfo ? (
           <Link href="/info/detail" className="block">
-            <div className="flex items-center gap-4 mt-4 bg-white p-3 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 transition-colors">
-              <div className="w-16 h-16 bg-pink-100 rounded-full flex items-center justify-center">
-                {petInfo?.photoUrl ? (
-                  <Image
-                    src={petInfo.photoUrl}
-                    alt={petInfo.name || "반려견"}
-                    width={64}
-                    height={64}
-                    className="rounded-full object-cover w-full h-full"
-                  />
-                ) : (
-                  <Dog className="w-8 h-8 text-pink-400" />
-                )}
+            <div className="flex items-center gap-4 mt-4 bg-white p-4 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 hover:shadow-md transition-all duration-200">
+              <div className="relative">
+                <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200">
+                  {petProfileImageUrl && !imageLoadError ? (
+                    <Image
+                      src={petProfileImageUrl}
+                      alt={petInfo.name || "반려견"}
+                      width={80}
+                      height={80}
+                      className="rounded-full object-cover w-full h-full"
+                      onError={() => setImageLoadError(true)}
+                    />
+                  ) : (
+                    <Dog className="w-10 h-10 text-pink-400" />
+                  )}
+                </div>
+                {/* 온라인 표시 (선택적) */}
+                <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                  <PawPrint className="w-3 h-3 text-white" />
+                </div>
               </div>
-              <div>
-                <h2 className="text-xl font-bold text-gray-800">{petInfo.name}</h2>
-                <div className="flex gap-3 text-sm text-gray-600">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h2 className="text-xl font-bold text-gray-800">{petInfo.name}</h2>
+                  <Badge variant="secondary" className="text-xs bg-pink-50 text-pink-700 border-pink-200">
+                    {petInfo.ageGroup}
+                  </Badge>
+                </div>
+                <div className="flex gap-3 text-sm text-gray-600 mb-1">
                   <span>{calculateAge(petInfo.birthday)}</span>
                   <span>•</span>
-                  <span>{petInfo.gender === "남아" ? "남아" : petInfo.gender === "여아" ? "여아" : petInfo.gender}</span>
+                  <span>{petInfo.gender === "남아" ? "♂ 남아" : petInfo.gender === "여아" ? "♀ 여아" : petInfo.gender}</span>
                   {petInfo.weight && (
                     <>
                       <span>•</span>
@@ -461,6 +484,12 @@ export default function DashboardContent() {
                     </>
                   )}
                 </div>
+                {petInfo.breed && (
+                  <div className="text-xs text-gray-500 flex items-center gap-1">
+                    <Dog className="w-3 h-3" />
+                    {petInfo.breed}
+                  </div>
+                )}
               </div>
             </div>
           </Link>
