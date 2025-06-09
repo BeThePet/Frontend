@@ -39,15 +39,6 @@ export function useChatbot() {
     setState(prev => ({ ...prev, error }))
   }, [])
 
-  const setLoading = useCallback((isLoading: boolean) => {
-    setState(prev => ({ ...prev, isLoading }))
-  }, [])
-
-  const setSending = useCallback((isSending: boolean) => {
-    setState(prev => ({ ...prev, isSending }))
-    sendingRef.current = isSending
-  }, [])
-
   // 대화 상태 판단 함수
   const determineChatState = useCallback((assistantMessage: string): ChatState => {
     // AI 응답에 "추가 증상이나 상태가 있나요?" 문구가 있으면 추가 증상 대기 상태
@@ -59,25 +50,33 @@ export function useChatbot() {
 
   // 대화방 목록 조회
   const fetchRooms = useCallback(async () => {
-    if (state.isLoading) return
+    // 현재 상태를 내부에서 확인하여 의존성 제거
+    let shouldFetch = false
+    setState(prev => {
+      if (prev.isLoading) {
+        return prev // 이미 로딩 중이면 상태 변경하지 않음
+      }
+      shouldFetch = true
+      return { ...prev, isLoading: true, error: null }
+    })
 
-    setLoading(true)
-    setError(null)
+    if (!shouldFetch) return
     
     try {
       const rooms: ChatRoomResponse[] = await chatbotApi.getRooms()
-      setState(prev => ({ ...prev, rooms }))
+      setState(prev => ({ ...prev, rooms, isLoading: false }))
     } catch (error) {
-      setError(error instanceof Error ? error.message : '대화방을 불러오는 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
+      setState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : '대화방을 불러오는 중 오류가 발생했습니다.',
+        isLoading: false
+      }))
     }
-  }, [state.isLoading, setLoading, setError])
+  }, []) // 의존성 제거
 
   // 새 대화방 생성
   const createRoom = useCallback(async (title?: string) => {
-    setLoading(true)
-    setError(null)
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
       const newRoom: ChatRoom = await chatbotApi.createRoom(title)
@@ -86,21 +85,20 @@ export function useChatbot() {
       setState(prev => ({ 
         ...prev, 
         rooms: [newRoomResponse, ...prev.rooms],
-        currentRoom: newRoom
+        currentRoom: newRoom,
+        isLoading: false
       }))
       return newRoom
     } catch (error) {
-      setError(error instanceof Error ? error.message : '대화방 생성 중 오류가 발생했습니다.')
+      const errorMessage = error instanceof Error ? error.message : '대화방 생성 중 오류가 발생했습니다.'
+      setState(prev => ({ ...prev, error: errorMessage, isLoading: false }))
       throw error
-    } finally {
-      setLoading(false)
     }
-  }, [setLoading, setError])
+  }, [])
 
   // 대화방 삭제
   const deleteRoom = useCallback(async (roomId: string) => {
-    setLoading(true)
-    setError(null)
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
     
     try {
       await chatbotApi.deleteRoom(roomId)
@@ -109,22 +107,27 @@ export function useChatbot() {
         rooms: prev.rooms.filter(room => room.id !== roomId),
         currentRoom: prev.currentRoom?.id === roomId ? null : prev.currentRoom,
         messages: prev.currentRoom?.id === roomId ? [] : prev.messages,
-        chatState: prev.currentRoom?.id === roomId ? 'initial' : prev.chatState
+        chatState: prev.currentRoom?.id === roomId ? 'initial' : prev.chatState,
+        isLoading: false
       }))
     } catch (error) {
-      setError(error instanceof Error ? error.message : '대화방 삭제 중 오류가 발생했습니다.')
+      const errorMessage = error instanceof Error ? error.message : '대화방 삭제 중 오류가 발생했습니다.'
+      setState(prev => ({ ...prev, error: errorMessage, isLoading: false }))
       throw error
-    } finally {
-      setLoading(false)
     }
-  }, [setLoading, setError])
+  }, [])
 
   // 대화방 선택 및 메시지 조회
   const selectRoom = useCallback(async (room: ChatRoom | ChatRoomResponse) => {
-    if (state.currentRoom?.id === room.id) return
-
-    setLoading(true)
-    setError(null)
+    // 현재 상태를 함수 내부에서 확인하여 의존성 제거
+    setState(prev => {
+      if (prev.currentRoom?.id === room.id) {
+        return prev // 이미 같은 방이면 상태 변경하지 않음
+      }
+      
+      // 로딩 시작
+      return { ...prev, isLoading: true, error: null }
+    })
     
     try {
       const chatHistory: ChatHistoryResponse = await chatbotApi.getMessages(room.id)
@@ -143,14 +146,17 @@ export function useChatbot() {
         currentRoom: room,
         messages: chatHistory.messages,
         dogInfo: chatHistory.dog_info,
-        chatState
+        chatState,
+        isLoading: false
       }))
     } catch (error) {
-      setError(error instanceof Error ? error.message : '메시지를 불러오는 중 오류가 발생했습니다.')
-    } finally {
-      setLoading(false)
+      setState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : '메시지를 불러오는 중 오류가 발생했습니다.',
+        isLoading: false
+      }))
     }
-  }, [state.currentRoom?.id, setLoading, setError, determineChatState])
+  }, [determineChatState]) // 의존성 대폭 축소
 
   // 사용자 메시지를 즉시 UI에 추가 (실시간 느낌)
   const addUserMessage = useCallback((content: string) => {
@@ -193,8 +199,8 @@ export function useChatbot() {
   const sendFirstMessage = useCallback(async (roomId: string, content: string) => {
     if (sendingRef.current || !content.trim()) return
 
-    setSending(true)
-    setError(null)
+    setState(prev => ({ ...prev, isSending: true, error: null }))
+    sendingRef.current = true
 
     // 사용자 메시지를 즉시 UI에 추가
     const tempMessageId = addUserMessage(content)
@@ -215,7 +221,8 @@ export function useChatbot() {
         rooms: prev.rooms.map(room => 
           room.id === roomId ? { ...room, title: response.title } : room
         ),
-        chatState: newChatState
+        chatState: newChatState,
+        isSending: false
       }))
 
       // AI 응답 추가
@@ -223,23 +230,25 @@ export function useChatbot() {
       
     } catch (error) {
       // 오류 시 사용자 메시지 제거
+      const errorMessage = error instanceof Error ? error.message : '메시지 전송 중 오류가 발생했습니다.'
       setState(prev => ({
         ...prev,
-        messages: prev.messages.filter(msg => msg.id !== tempMessageId)
+        messages: prev.messages.filter(msg => msg.id !== tempMessageId),
+        error: errorMessage,
+        isSending: false
       }))
-      setError(error instanceof Error ? error.message : '메시지 전송 중 오류가 발생했습니다.')
       throw error
     } finally {
-      setSending(false)
+      sendingRef.current = false
     }
-  }, [addUserMessage, addAssistantMessage, setSending, setError, determineChatState])
+  }, [addUserMessage, addAssistantMessage, determineChatState])
 
   // 일반 메시지 전송
   const sendMessage = useCallback(async (roomId: string, content: string) => {
     if (sendingRef.current || !content.trim()) return
 
-    setSending(true)
-    setError(null)
+    setState(prev => ({ ...prev, isSending: true, error: null }))
+    sendingRef.current = true
 
     // 사용자 메시지를 즉시 UI에 추가
     const tempMessageId = addUserMessage(content)
@@ -253,7 +262,8 @@ export function useChatbot() {
       // 대화 상태 업데이트
       setState(prev => ({
         ...prev,
-        chatState: newChatState
+        chatState: newChatState,
+        isSending: false
       }))
       
       // AI 응답 추가
@@ -261,16 +271,18 @@ export function useChatbot() {
       
     } catch (error) {
       // 오류 시 사용자 메시지 제거
+      const errorMessage = error instanceof Error ? error.message : '메시지 전송 중 오류가 발생했습니다.'
       setState(prev => ({
         ...prev,
-        messages: prev.messages.filter(msg => msg.id !== tempMessageId)
+        messages: prev.messages.filter(msg => msg.id !== tempMessageId),
+        error: errorMessage,
+        isSending: false
       }))
-      setError(error instanceof Error ? error.message : '메시지 전송 중 오류가 발생했습니다.')
       throw error
     } finally {
-      setSending(false)
+      sendingRef.current = false
     }
-  }, [addUserMessage, addAssistantMessage, setSending, setError, determineChatState])
+  }, [addUserMessage, addAssistantMessage, determineChatState])
 
   // 새 대화 시작 헬퍼
   const startNewConversation = useCallback(async (initialMessage: string) => {

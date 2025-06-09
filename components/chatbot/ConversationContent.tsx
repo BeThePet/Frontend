@@ -33,6 +33,7 @@ export default function ConversationContent() {
   const [inputMessage, setInputMessage] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const loadedRoomRef = useRef<string | null>(null) // 이미 로드된 roomId 추적
 
   // 메시지 목록 자동 스크롤
   const scrollToBottom = () => {
@@ -43,9 +44,11 @@ export default function ConversationContent() {
     scrollToBottom()
   }, [messages])
 
-  // roomId가 변경되거나 초기 로드 시 대화방 선택
+  // roomId가 변경되거나 초기 로드 시 대화방 선택 (한 번만)
   useEffect(() => {
-    if (roomId && currentRoom?.id !== roomId) {
+    if (roomId && roomId !== loadedRoomRef.current && currentRoom?.id !== roomId) {
+      loadedRoomRef.current = roomId
+      
       // 임시 방 객체를 생성하여 selectRoom 호출
       const tempRoom = {
         id: roomId,
@@ -57,7 +60,7 @@ export default function ConversationContent() {
       }
       selectRoom(tempRoom)
     }
-  }, [roomId, currentRoom?.id, selectRoom])
+  }, [roomId, currentRoom?.id]) // selectRoom 의존성 제거
 
   // roomId가 없으면 메인 페이지로 리다이렉트
   useEffect(() => {
