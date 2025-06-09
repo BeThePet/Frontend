@@ -1130,24 +1130,65 @@ const getAuthHeaders = () => {
 
 // Cookie-based fetch wrapper
 const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  console.log(`API 호출: ${API_BASE_URL}${endpoint}`)
+  console.log(`🔥 API 호출: ${API_BASE_URL}${endpoint}`, {
+    method: options.method || 'GET',
+    headers: options.headers,
+    body: options.body instanceof FormData ? '[FormData]' : options.body,
+    credentials: 'include'
+  })
   
   // FormData인 경우 Content-Type을 설정하지 않음 (브라우저가 자동 설정)
   const isFormData = options.body instanceof FormData
   
   const headers: HeadersInit = isFormData 
-    ? { ...options.headers } // FormData일 때는 Content-Type 없음
+    ? { 
+        ...options.headers,
+        // FormData일 때는 Content-Type 없음
+      } 
     : {
         'Content-Type': 'application/json',
         ...options.headers,
       }
   
-  return fetch(`${API_BASE_URL}${endpoint}`, {
+  // 쿠키 확인
+  if (typeof window !== 'undefined') {
+    console.log('🍪 현재 쿠키:', document.cookie)
+  }
+  
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     credentials: 'include', // 🔥 중요: 쿠키 자동 포함 (CORS 설정 필요)
     mode: 'cors', // CORS 모드 명시적 설정
     headers,
     ...options,
   })
+
+  // 응답 로그
+  console.log(`📡 API 응답: ${endpoint}`, {
+    status: response.status,
+    ok: response.ok,
+    statusText: response.statusText,
+    headers: Object.fromEntries(response.headers.entries())
+  })
+
+  // 에러 응답일 때 상세 정보 로그
+  if (!response.ok) {
+    try {
+      const errorBody = await response.clone().text()
+      console.error(`❌ API 에러 상세: ${endpoint}`, {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorBody,
+        headers: Object.fromEntries(response.headers.entries())
+      })
+    } catch (e) {
+      console.error(`❌ API 에러 (응답 파싱 실패): ${endpoint}`, {
+        status: response.status,
+        statusText: response.statusText
+      })
+    }
+  }
+
+  return response
 }
 
 // API call with automatic token refresh (중복 갱신 방지)
