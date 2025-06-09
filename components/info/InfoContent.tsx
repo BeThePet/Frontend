@@ -466,14 +466,17 @@ export default function InfoContent() {
         }
         localStorage.setItem('registeredPetInfo', JSON.stringify(updatedInfo))
         
-        // 수정 완료 메시지 표시 후 페이지에 머무르기
+        // 수정 완료 메시지 표시 후 detail 페이지로 이동
         toast({
           title: "수정 완료!",
           description: `${result.name}의 정보가 성공적으로 수정되었습니다.`,
         })
         
-        setIsSubmitting(false)
-        // 수정 모드에서는 리다이렉트하지 않음
+        // 잠시 후 detail 페이지로 이동 (수정 모드일 때)
+        setTimeout(() => {
+          setIsSubmitting(false)
+          router.push("/info/detail")
+        }, 1500)
         return
         
       } else {

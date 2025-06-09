@@ -403,21 +403,44 @@ export const userApi = {
   // 로그인 (POST /user/login)
   login: async (credentials: UserLoginRequest): Promise<{ success: boolean; user?: UserResponse; error?: string }> => {
     try {
+      console.log('🔐 로그인 API 호출 시작:', credentials.email)
       const response = await apiCall('/user/login', {
         method: 'POST',
         body: JSON.stringify(credentials),
       })
       
+      console.log('🔐 로그인 API 응답:', {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      })
+      
       if (response.ok) {
         const user = await response.json()
-        // 로그인 성공 - 쿠키 자동 설정됨
+        console.log('✅ 로그인 성공')
         return { success: true, user }
       } else {
-        const error = await response.json()
-        return { success: false, error: error.detail }
+        let errorMessage = '로그인에 실패했습니다.'
+        
+        try {
+          const errorData = await response.json()
+          console.log('❌ 로그인 실패 응답:', errorData)
+          
+          // 다양한 에러 응답 형태 처리
+          errorMessage = errorData.detail || 
+                        errorData.message || 
+                        errorData.error || 
+                        `서버 오류 (${response.status})`
+        } catch (parseError) {
+          console.log('❌ 에러 응답 파싱 실패:', parseError)
+          errorMessage = `로그인 실패 (상태: ${response.status})`
+        }
+        
+        return { success: false, error: errorMessage }
       }
     } catch (error) {
-      return { success: false, error: '네트워크 오류' }
+      console.error('❌ 로그인 API 네트워크 오류:', error)
+      return { success: false, error: '네트워크 연결에 문제가 있습니다. 다시 시도해주세요.' }
     }
   },
 
@@ -1271,9 +1294,6 @@ const apiCallWithRetry = async (endpoint: string, options: RequestInit = {}): Pr
 // 인증 실패 시 처리 함수
 const handleAuthenticationFailure = () => {
   if (typeof window !== 'undefined') {
-    // 로컬 스토리지 정리
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
     
     // 사용자에게 알림
     alert('로그인이 만료되었습니다. 다시 로그인해주세요.')

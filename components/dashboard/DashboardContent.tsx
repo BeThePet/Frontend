@@ -96,28 +96,11 @@ export default function DashboardContent() {
               setPetProfileImageUrl(imageInfo.profile_image_url || dogInfo.profile_image_url || "")
               setImageLoadError(false) // 이미지 에러 상태 리셋
               
-              // 백엔드 데이터를 localStorage에도 백업 저장
-              localStorage.setItem('registeredPetInfo', JSON.stringify(petData))
-            } else {
-              // 백엔드에 반려견 정보가 없으면 localStorage 확인
-              const savedPetInfo = localStorage.getItem('registeredPetInfo')
-              if (savedPetInfo) {
-                setPetInfo(JSON.parse(savedPetInfo))
-              }
             }
           } catch (error) {
             console.error("백엔드에서 반려견 정보 로드 실패:", error)
-            // 백엔드 실패 시 localStorage에서 데이터 로드
-            const savedPetInfo = localStorage.getItem('registeredPetInfo')
-            if (savedPetInfo) {
-              setPetInfo(JSON.parse(savedPetInfo))
-            }
-          }
-        } else {
-          // 비로그인 상태에서는 localStorage만 확인
-          const savedPetInfo = localStorage.getItem('registeredPetInfo')
-          if (savedPetInfo) {
-            setPetInfo(JSON.parse(savedPetInfo))
+            // 백엔드 실패 시 반려견 정보 없음으로 처리
+            setPetInfo(null)
           }
         }
 
@@ -244,16 +227,9 @@ export default function DashboardContent() {
 
           } catch (error) {
             console.error("건강 데이터 조회 실패:", error)
-            // API 실패 시 로컬 스토리지 백업 사용
-            const savedHealthData = getData("healthData")
-            if (savedHealthData) {
-              setHealthData(savedHealthData)
-            }
-            
-            const today = new Date()
-            const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`
-            const todayCheck = getData(`dailyCheck_${formattedDate}`)
-            setTodayChecked(!!todayCheck)
+            // API 실패 시 빈 데이터로 처리
+            setHealthData({ activities: [], healthChecks: [] })
+            setTodayChecked(false)
           }
         }
 
@@ -294,6 +270,36 @@ export default function DashboardContent() {
 
     try {
       await userApi.logout()
+      
+      // 로컬스토리지에서 개인정보 관련 데이터 정리
+      if (typeof window !== 'undefined') {
+        // 사용자 및 반려견 정보
+        localStorage.removeItem('registeredPetInfo')
+        localStorage.removeItem('userInfo')
+        localStorage.removeItem('petInfo')
+        
+        // 건강 데이터
+        localStorage.removeItem('healthData')
+        
+        // 일일 건강체크 기록들 (날짜별로 저장된 것들)
+        const keysToRemove = []
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i)
+          if (key && (
+            key.startsWith('dailyCheck_') ||
+            key.startsWith('water_') ||
+            key.startsWith('feed_') ||
+            key.startsWith('walk_') ||
+            key.startsWith('weight_')
+          )) {
+            keysToRemove.push(key)
+          }
+        }
+        keysToRemove.forEach(key => localStorage.removeItem(key))
+        
+        console.log('로그아웃 시 개인정보 관련 로컬스토리지 정리 완료')
+      }
+      
       setIsLoggedIn(false)
       setUserInfo(null)
       setPetInfo(null)

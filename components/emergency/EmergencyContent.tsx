@@ -23,6 +23,7 @@ export default function EmergencyContent() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('🔥 응급가이드 데이터 로딩 시작')
         setIsLoading(true)
         setIsLoadingGuides(true)
         
@@ -31,23 +32,39 @@ export default function EmergencyContent() {
         localStorage.removeItem('emergencyHospitals')
         localStorage.removeItem('testData')
         
-        // 응급 병원 요약 정보와 응급 가이드를 동시에 불러오기 (백엔드 API만 사용)
-        const [emergencyHospitalsSummary, guides] = await Promise.all([
-          emergencyApi.getEmergencyHospitalsSummary(),
-          emergencyApi.getGuides()
-        ])
+        console.log('🔥 응급가이드 API 호출 시작')
         
-        console.log('🚑 응급가이드 로드:', guides)
-        console.log('🏥 응급병원 로드:', emergencyHospitalsSummary)
+        // 응급 가이드 불러오기 (반려견 등록 여부와 상관없이 항상 성공해야 함)
+        try {
+          const guides = await emergencyApi.getGuides()
+          console.log('✅ 응급가이드 로드 성공:', guides)
+          console.log('✅ 응급가이드 개수:', guides.length)
+          console.log('✅ 응급가이드 첫 번째 항목:', guides[0])
+          setEmergencyGuides(guides)
+        } catch (error) {
+          console.error("❌ 응급가이드 로드 실패:", error)
+          setEmergencyGuides([])
+        }
         
-        setEmergencyHospitals(emergencyHospitalsSummary)
-        setEmergencyGuides(guides)
+        console.log('🔥 응급 병원 API 호출 시작')
+        
+        // 응급 병원 요약 정보 불러오기 (반려견이 등록되지 않으면 실패할 수 있음)
+        try {
+          const emergencyHospitalsSummary = await emergencyApi.getEmergencyHospitalsSummary()
+          console.log('✅ 응급병원 로드 성공:', emergencyHospitalsSummary)
+          console.log('✅ 응급병원 개수:', emergencyHospitalsSummary.length)
+          setEmergencyHospitals(emergencyHospitalsSummary)
+        } catch (error) {
+          console.error("❌ 응급병원 로드 실패 (반려견 미등록일 수 있음):", error)
+          setEmergencyHospitals([])
+        }
+        
+        console.log('🎯 상태 업데이트 완료')
       } catch (error) {
-        console.error("백엔드에서 응급 데이터를 불러오는 중 오류:", error)
-        // 백엔드 실패 시 빈 배열로 설정 (하드코딩 데이터 사용 안함)
-        setEmergencyHospitals([])
-        setEmergencyGuides([])
+        console.error("❌ 예상치 못한 오류:", error)
+        console.error("❌ 에러 스택:", error instanceof Error ? error.stack : String(error))
       } finally {
+        console.log('🏁 로딩 완료, 상태 업데이트')
         setIsLoading(false)
         setIsLoadingGuides(false)
       }

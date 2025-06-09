@@ -23,11 +23,21 @@ export default function LoginPage() {
     setError("")
 
     try {
-      await userApi.login({ email, password })
-      router.push("/dashboard")
+      console.log("로그인 시도:", { email, password: "***" })
+      const result = await userApi.login({ email, password })
+      console.log("로그인 결과:", result)
+      
+      if (result.success) {
+        console.log("로그인 성공, 대시보드로 이동")
+        router.push("/dashboard")
+      } else {
+        console.log("로그인 실패:", result.error)
+        // 백엔드에서 반환하는 구체적인 에러 메시지 표시
+        setError(result.error || "로그인에 실패했습니다.")
+      }
     } catch (error) {
-      console.error("로그인 실패:", error)
-      setError("이메일 또는 비밀번호가 올바르지 않습니다.")
+      console.error("로그인 API 호출 실패:", error)
+      setError("네트워크 오류가 발생했습니다. 다시 시도해주세요.")
     } finally {
       setIsLoading(false)
     }
