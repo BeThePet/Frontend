@@ -323,16 +323,25 @@ export default function InfoContent() {
       setIsUploadingImage(true)
       console.log("이미지 업로드 시작:", file.name)
       
-      // 백엔드에 이미지 업로드 (첫 업로드 시도)
       let uploadResult
-      try {
-        uploadResult = await dogApi.uploadDogImage(file)
-      } catch (error: any) {
-        // 이미 이미지가 있으면 PUT으로 교체
-        if (error.message.includes('이미 프로필 이미지가 존재합니다')) {
-          uploadResult = await dogApi.updateDogImage(file)
-        } else {
-          throw error
+      
+      if (isEditMode) {
+        // 수정 모드: 바로 PUT으로 이미지 교체
+        console.log("🔄 수정 모드: updateDogImage (PUT) 호출")
+        uploadResult = await dogApi.updateDogImage(file)
+      } else {
+        // 등록 모드: POST로 첫 업로드 시도
+        console.log("📤 등록 모드: uploadDogImage (POST) 호출")
+        try {
+          uploadResult = await dogApi.uploadDogImage(file)
+        } catch (error: any) {
+          // 이미 이미지가 있으면 PUT으로 교체
+          if (error.message.includes('이미 프로필 이미지가 존재합니다')) {
+            console.log("🔄 이미 이미지 존재, updateDogImage (PUT)로 재시도")
+            uploadResult = await dogApi.updateDogImage(file)
+          } else {
+            throw error
+          }
         }
       }
       
