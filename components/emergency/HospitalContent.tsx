@@ -35,6 +35,11 @@ export default function HospitalContent() {
   const [specialties, setSpecialties] = useState<string[]>([])
   const [activeTab, setActiveTab] = useState<string>("all")
 
+  // 전문분야 옵션들 (한글로 사용)
+  const getDisplaySpecialties = () => {
+    return ["일반 진료", "외과", "내과", "치과", "심장내과", "응급 처치", "피부과", "안과", "중환자실", "특수동물"]
+  }
+
   // 병원 정보 불러오기 (탭에 따라 다른 API 호출)
   useEffect(() => {
     const loadData = async () => {
@@ -301,7 +306,7 @@ export default function HospitalContent() {
                   <div className="space-y-2">
                     <Label>전문 분야</Label>
                     <div className="flex flex-wrap gap-2">
-                      {["일반 진료", "응급 처치", "외과", "내과", "피부과", "안과", "치과", "중환자실", "특수동물"].map(
+                      {getDisplaySpecialties().map(
                         (specialty) => (
                           <Badge
                             key={specialty}

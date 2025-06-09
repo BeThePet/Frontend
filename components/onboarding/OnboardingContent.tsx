@@ -6,6 +6,7 @@ import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { motion } from "framer-motion"
 import { Heart, Activity, Stethoscope, Shield } from "lucide-react"
+import { userApi } from "@/lib/api"
 
 export default function OnboardingContent() {
   const router = useRouter()
@@ -14,10 +15,14 @@ export default function OnboardingContent() {
 
   useEffect(() => {
     setMounted(true)
-    // 로그인 상태 확인 (실제 구현에서는 서버에서 확인)
-    const checkLoginStatus = () => {
-      const token = localStorage.getItem('token')
-      setIsLoggedIn(!!token)
+    // 로그인 상태 확인
+    const checkLoginStatus = async () => {
+      try {
+        await userApi.getCurrentUser()
+        setIsLoggedIn(true)
+      } catch (error) {
+        setIsLoggedIn(false)
+      }
     }
     checkLoginStatus()
   }, [])

@@ -11,95 +11,77 @@ import { ArrowLeft, Check, Bell, Save } from "lucide-react"
 import { format } from "date-fns"
 import { ko } from "date-fns/locale"
 import { motion } from "framer-motion"
-import { saveData, getData } from "@/lib/storage"
-import { useToast } from "@/components/ui/use-toast"
+import { useToast } from "@/hooks/use-toast"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
-
-// 백신 데이터 정의
-const vaccineTypes = [
-  {
-    id: "dhppl",
-    name: "DHPPL (종합백신)",
-    period: 365,
-    category: "필수",
-    description: "디스템퍼, 간염, 파보바이러스, 파라인플루엔자, 렙토스피라증",
-  },
-  {
-    id: "rabies",
-    name: "광견병 (Rabies)",
-    period: 365,
-    category: "필수",
-    description: "치명적인 바이러스성 질환 예방 (법적 의무)",
-  },
-  {
-    id: "heartworm",
-    name: "심장사상충 예방약",
-    period: 30,
-    category: "필수",
-    description: "모기를 통해 전염되는 기생충 예방",
-  },
-  {
-    id: "kennel",
-    name: "켄넬코프 (KC, Bordetella)",
-    period: 365,
-    category: "선택",
-    description: "전염성 기관지염 예방",
-  },
-  {
-    id: "corona",
-    name: "코로나 장염 백신",
-    period: 365,
-    category: "선택",
-    description: "개 코로나 바이러스 예방",
-  },
-  {
-    id: "influenza",
-    name: "인플루엔자 백신",
-    period: 365,
-    category: "선택",
-    description: "개 인플루엔자 예방",
-  },
-]
+import { vaccineApi, VaccineType, VaccinationRequest, VaccinationResponse } from "@/lib/api"
 
 export default function VaccineContent() {
   const router = useRouter()
   const { toast } = useToast()
+  const [mounted, setMounted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
   const [hospital, setHospital] = useState("")
   const [memo, setMemo] = useState("")
-  const [vaccineData, setVaccineData] = useState<any[]>([])
+  
+  // API 데이터 상태
+  const [vaccineTypes, setVaccineTypes] = useState<VaccineType[]>([])
+  const [vaccinations, setVaccinations] = useState<VaccinationResponse[]>([])
   const [selectedVaccines, setSelectedVaccines] = useState<Record<string, any>>({})
-  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
+    loadData()
   }, [])
 
-  // 기존 데이터 불러오기
-  useEffect(() => {
-    if (!mounted) return;
+  // 데이터 로드 함수
+  const loadData = async () => {
+    try {
+      setIsLoading(true)
 
-    const savedVaccineData = getData("vaccineData") || []
-    setVaccineData(savedVaccineData)
+      // 백신 타입과 접종 기록 병렬로 로드
+      const [vaccineTypesData, vaccinationsData] = await Promise.all([
+        vaccineApi.getVaccineTypes(),
+        vaccineApi.getVaccinations()
+      ])
 
-    // 기존 데이터로 선택 상태 초기화
-    const initialSelected: Record<string, any> = {}
+      setVaccineTypes(vaccineTypesData)
+      setVaccinations(vaccinationsData)
 
-    savedVaccineData.forEach((vaccine: any) => {
-      const foundVaccine = vaccineTypes.find((v) => v.name.includes(vaccine.name))
-      if (foundVaccine) {
-        initialSelected[foundVaccine.id] = {
+      // 기존 접종 기록으로 선택 상태 초기화
+      const initialSelected: Record<string, any> = {}
+      
+      vaccinationsData.forEach((vaccination) => {
+        initialSelected[vaccination.vaccine_id] = {
           selected: true,
-          date: vaccine.date ? new Date(vaccine.date.split(".").reverse().join("-")) : null,
-          hospital: vaccine.hospital || "",
-          memo: vaccine.memo || "",
+          date: new Date(vaccination.date),
+          hospital: vaccination.hospital || "",
+          memo: vaccination.memo || "",
+          vaccinationId: vaccination.id
         }
-      }
-    })
+      })
 
-    setSelectedVaccines(initialSelected)
-  }, [mounted])
+      setSelectedVaccines(initialSelected)
+      
+      // 마지막으로 입력된 병원명과 메모 설정
+      if (vaccinationsData.length > 0) {
+        const lastVaccination = vaccinationsData[vaccinationsData.length - 1]
+        setHospital(lastVaccination.hospital || "")
+        setMemo(lastVaccination.memo || "")
+      }
+
+    } catch (error) {
+      console.error("데이터 로드 실패:", error)
+      toast({
+        title: "데이터 로드 실패",
+        description: "백신 정보를 불러오는데 실패했습니다.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   if (!mounted) {
     return null
@@ -117,14 +99,10 @@ export default function VaccineContent() {
   }
 
   // 백신 날짜 변경 핸들러
-  const handleDateChange = (id: string, dateStr: string) => {
-    // 날짜 문자열을 Date 객체로 변환
-    const dateParts = dateStr.split("-")
-    const year = Number.parseInt(dateParts[0])
-    const month = Number.parseInt(dateParts[1]) - 1 // 월은 0부터 시작
-    const day = Number.parseInt(dateParts[2])
+  const handleDateChange = async (id: string, dateStr: string) => {
+    if (!dateStr) return
 
-    const date = new Date(year, month, day)
+    const date = new Date(dateStr)
 
     setSelectedVaccines((prev) => ({
       ...prev,
@@ -136,46 +114,50 @@ export default function VaccineContent() {
     }))
 
     // 자동 저장
-    saveVaccineData(id, date)
+    await saveVaccineData(id, dateStr)
   }
 
   // 백신 데이터 자동 저장
-  const saveVaccineData = (id: string, date: Date) => {
-    const vaccine = vaccineTypes.find((v) => v.id === id)
-    if (!vaccine) return
+  const saveVaccineData = async (vaccineId: string, date: string) => {
+    try {
+      const vaccine = vaccineTypes.find((v) => v.id === vaccineId)
+      if (!vaccine) return
 
-    // 기존 데이터에서 해당 백신 찾기
-    const existingIndex = vaccineData.findIndex((v) => v.id === id || v.name.includes(vaccine.name))
+      const vaccinationData: VaccinationRequest = {
+        vaccine_id: vaccineId,
+        date: date,
+        hospital: hospital || undefined,
+        memo: memo || undefined,
+      }
 
-    const formattedDate = format(date, "yyyy.MM.dd", { locale: ko })
+      const existingVaccination = vaccinations.find(v => v.vaccine_id === vaccineId)
+      
+      if (existingVaccination) {
+        // 기존 접종 기록 업데이트
+        await vaccineApi.updateVaccination(existingVaccination.id, vaccinationData)
+      } else {
+        // 새 접종 기록 생성
+        await vaccineApi.createVaccination(vaccinationData)
+      }
 
-    // 새 백신 데이터 생성
-    const newVaccineRecord = {
-      id: id,
-      name: vaccine.name,
-      date: formattedDate,
-      status: "완료",
-      hospital: hospital || "미입력",
-      memo: memo || "",
+      // 데이터 새로고침
+      await loadData()
+
+      // 토스트 메시지 표시
+      const formattedDate = format(date, "yyyy.MM.dd", { locale: ko })
+      toast({
+        title: "백신 날짜가 저장되었습니다",
+        description: `${vaccine.name}: ${formattedDate}`,
+      })
+
+    } catch (error) {
+      console.error("백신 데이터 저장 실패:", error)
+      toast({
+        title: "저장 실패",
+        description: "백신 정보 저장에 실패했습니다.",
+        variant: "destructive",
+      })
     }
-
-    // 기존 데이터 업데이트 또는 새 데이터 추가
-    const updatedVaccineData = [...vaccineData]
-    if (existingIndex >= 0) {
-      updatedVaccineData[existingIndex] = newVaccineRecord
-    } else {
-      updatedVaccineData.push(newVaccineRecord)
-    }
-
-    // 데이터 저장
-    saveData("vaccineData", updatedVaccineData)
-    setVaccineData(updatedVaccineData)
-
-    // 토스트 메시지 표시
-    toast({
-      title: "백신 날짜가 저장되었습니다",
-      description: `${vaccine.name}: ${formattedDate}`,
-    })
   }
 
   // 병원 정보 변경 핸들러
@@ -189,31 +171,61 @@ export default function VaccineContent() {
   }
 
   // 모든 변경사항 저장
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     setIsSubmitting(true)
 
-    // 병원 및 메모 정보 업데이트
-    const updatedVaccineData = vaccineData.map((vaccine) => {
-      return {
-        ...vaccine,
-        hospital: hospital || vaccine.hospital || "미입력",
-        memo: memo || vaccine.memo || "",
-      }
-    })
+    try {
+      // 선택된 백신들에 대해 병원과 메모 정보 업데이트
+      const updatePromises = Object.entries(selectedVaccines)
+        .filter(([_, data]) => data.selected && data.date)
+        .map(async ([vaccineId, data]) => {
+          const vaccinationData: VaccinationRequest = {
+            vaccine_id: vaccineId,
+            date: format(data.date, "yyyy-MM-dd"),
+            hospital: hospital || undefined,
+            memo: memo || undefined,
+          }
 
-    // 데이터 저장
-    saveData("vaccineData", updatedVaccineData)
+          const existingVaccination = vaccinations.find(v => v.vaccine_id === vaccineId)
+          
+          if (existingVaccination) {
+            return vaccineApi.updateVaccination(existingVaccination.id, vaccinationData)
+          } else {
+            return vaccineApi.createVaccination(vaccinationData)
+          }
+        })
 
-    // 성공 메시지 표시
-    toast({
-      title: "모든 정보가 저장되었습니다",
-    })
+      await Promise.all(updatePromises)
 
-    // 잠시 후 리포트 페이지로 이동
-    setTimeout(() => {
+      // 성공 메시지 표시
+      toast({
+        title: "모든 정보가 저장되었습니다",
+        description: "백신 접종 기록이 성공적으로 저장되었습니다.",
+      })
+
+      // 잠시 후 리포트 페이지로 이동
+      setTimeout(() => {
+        router.push("/report")
+      }, 1000)
+
+    } catch (error) {
+      console.error("저장 실패:", error)
+      toast({
+        title: "저장 실패",
+        description: "백신 정보 저장에 실패했습니다.",
+        variant: "destructive",
+      })
+    } finally {
       setIsSubmitting(false)
-      router.push("/report")
-    }, 1000)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#FFF8F0] flex justify-center items-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -352,7 +364,7 @@ function VaccineItem({
   onToggle,
   onDateChange,
 }: {
-  vaccine: (typeof vaccineTypes)[0]
+  vaccine: VaccineType
   isSelected: boolean
   date?: Date | null
   onToggle: () => void

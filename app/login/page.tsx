@@ -8,37 +8,26 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft } from "lucide-react"
+import { userApi } from "@/lib/api"
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
 
-    // Mock 로그인 (테스트용)
-    // 실제 구현에서는 백엔드 API 호출
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000)) // 로딩 시뮬레이션
-      
-      // 테스트용 계정: test@example.com / password123
-      if (email === "test@example.com" && password === "password123") {
-        localStorage.setItem("token", "mock-jwt-token-123")
-        localStorage.setItem("user", JSON.stringify({
-          id: "user-001",
-          email: "test@example.com",
-          name: "테스터"
-        }))
-        router.push("/dashboard")
-      } else {
-        alert("테스트 계정을 사용해주세요:\n이메일: test@example.com\n비밀번호: password123")
-      }
+      await userApi.login({ email, password })
+      router.push("/dashboard")
     } catch (error) {
       console.error("로그인 실패:", error)
-      alert("로그인 중 오류가 발생했습니다.")
+      setError("이메일 또는 비밀번호가 올바르지 않습니다.")
     } finally {
       setIsLoading(false)
     }
@@ -57,6 +46,12 @@ export default function LoginPage() {
         <Card className="bg-white rounded-xl shadow-sm">
           <CardContent className="p-5">
             <form onSubmit={handleSubmit} className="space-y-5">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="email">이메일</Label>
                 <Input
@@ -91,12 +86,6 @@ export default function LoginPage() {
                 {isLoading ? "로그인 중..." : "로그인"}
               </Button>
             </form>
-
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-700 font-medium">테스트 계정</p>
-              <p className="text-xs text-blue-600">이메일: test@example.com</p>
-              <p className="text-xs text-blue-600">비밀번호: password123</p>
-            </div>
 
             <div className="mt-4 text-center">
               <Link href="/signup" className="text-sm text-gray-600 hover:underline">

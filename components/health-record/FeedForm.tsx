@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { getData, saveData } from "@/lib/storage"
 import { NumberPicker } from "@/components/number-picker"
+import { healthApi } from "@/lib/api"
 
 interface FeedFormProps {
   petId: string
@@ -32,6 +33,7 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
     brand: "",
     amount_g: 100,
   })
+  const [existingRecordId, setExistingRecordId] = useState<number | null>(null)
 
   // today 값을 메모이제이션
   const today = useMemo(() => {
@@ -50,16 +52,53 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
           setPetInfo(savedPetInfo)
         }
 
-        // 오늘 사료 기록 확인
-        const savedFeedData = getData<FeedData>(`feed_${today}`)
-        if (savedFeedData && isMounted) {
-          setFormData(savedFeedData)
-          setCompletedToday(true)
-        } else if (isMounted) {
-          // 현재 시간을 기본값으로 설정
-          const now = new Date()
-          const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-          setFormData(prev => ({ ...prev, time: currentTime }))
+        // 백엔드에서 오늘 사료 기록 조회
+        try {
+          const todayFeeds = await healthApi.getFoodRecords()
+          
+          // 오늘 날짜에 해당하는 모든 기록 필터링
+          const todayRecords = todayFeeds.filter(record => {
+            const recordDate = record.created_at ? 
+              new Date(record.created_at).toISOString().split('T')[0] : ''
+            return recordDate === today
+          })
+          
+          // 가장 최근에 수정된 기록 선택 (updated_at 기준)
+          const todayFeed = todayRecords.length > 0 ? 
+            todayRecords.reduce((latest, current) => {
+              const latestUpdated = new Date(latest.updated_at || latest.created_at)
+              const currentUpdated = new Date(current.updated_at || current.created_at)
+              return currentUpdated > latestUpdated ? current : latest
+            }) : null
+          
+          if (todayFeed && isMounted) {
+            setFormData({ 
+              time: todayFeed.time,
+              brand: todayFeed.brand || "",
+              amount_g: todayFeed.amount_g 
+            })
+            setExistingRecordId(todayFeed.id)
+            setCompletedToday(true)
+          } else if (isMounted) {
+            // 기존 기록이 없으면 현재 시간을 기본값으로 설정
+            const now = new Date()
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+            setFormData(prev => ({ ...prev, time: currentTime }))
+          }
+        } catch (apiError) {
+          console.warn("백엔드에서 사료 데이터 조회 실패, 로컬 스토리지 확인:", apiError)
+          
+          // 백엔드 실패시 로컬 스토리지에서 데이터 로드
+          const savedFeedData = getData<FeedData>(`feed_${today}`)
+          if (savedFeedData && isMounted) {
+            setFormData(savedFeedData)
+            setCompletedToday(true)
+          } else if (isMounted) {
+            // 현재 시간을 기본값으로 설정
+            const now = new Date()
+            const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
+            setFormData(prev => ({ ...prev, time: currentTime }))
+          }
         }
       } catch (error) {
         console.error("사료 기록 데이터 로드 실패:", error)
@@ -95,10 +134,32 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
 
     setIsSubmitting(true)
     try {
-      // 로컬 스토리지에 저장
+      // 백엔드 API로 사료 기록 전송
+      const feedData = {
+        time: formData.time,
+        brand: formData.brand,
+        amount_g: formData.amount_g
+      }
+      
+              try {
+        // 수정인지 신규 등록인지 확인
+        if (existingRecordId) {
+          // 기존 기록이 있으면 PUT으로 수정
+          await healthApi.updateFoodRecord(existingRecordId, feedData)
+        } else {
+          // 기존 기록이 없으면 POST로 신규 등록
+          const newRecord = await healthApi.createFoodRecord(feedData)
+          setExistingRecordId(newRecord.id)
+        }
+      } catch (apiError) {
+        console.error('❌ 사료 기록 API 오류:', apiError)
+        throw apiError
+      }
+
+      // 성공 시에만 로컬 스토리지에 저장 (백업용)
       saveData(`feed_${today}`, formData)
 
-      // 건강 데이터에 활동 추가
+      // 건강 데이터에 활동 추가 (기존 로직 유지)
       const healthData = getData("healthData") as any || { activities: [], healthChecks: [] }
       const updatedHealthData = {
         activities: healthData.activities || [],
@@ -129,8 +190,8 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
       setCompletedToday(true)
       
       toast({
-        title: completedToday ? "사료 기록 수정 완료" : "사료 기록 완료",
-        description: "오늘의 사료 급여가 기록되었습니다.",
+        title: existingRecordId ? "사료 기록 수정 완료" : "사료 기록 완료",
+        description: "사료 급여 기록 성공!",
       })
       
       onComplete?.()
@@ -138,7 +199,7 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
       console.error("사료 기록 저장 실패:", error)
       toast({
         title: "저장 실패",
-        description: "사료 기록을 저장하는데 실패했습니다.",
+        description: `사료 기록을 저장하는데 실패했습니다. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       })
     } finally {
@@ -146,15 +207,9 @@ export default function FeedForm({ petId, onComplete }: FeedFormProps) {
     }
   }
 
-  // 폼 초기화
+  // 폼 초기화 (수정 모드로 전환) - 기존 값을 유지
   const resetForm = () => {
-    const now = new Date()
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`
-    setFormData({
-      time: currentTime,
-      brand: "",
-      amount_g: 100,
-    })
+    // 현재 저장된 값을 그대로 유지하고 편집 모드로만 전환
     setCompletedToday(false)
   }
 

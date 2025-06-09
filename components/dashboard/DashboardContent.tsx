@@ -30,14 +30,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getData, saveData } from "@/lib/storage"
 import { LinkButton } from "@/components/ui/link-button"
-import { userApi } from "@/lib/api"
+import { userApi, medicationApi, MedicationResponse } from "@/lib/api"
 
 export default function DashboardContent() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
   const [petInfo, setPetInfo] = useState<any>(null)
   const [healthData, setHealthData] = useState<any>(null)
-  const [medications, setMedications] = useState<any[]>([])
+  const [medications, setMedications] = useState<MedicationResponse[]>([])
   const [todayChecked, setTodayChecked] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
@@ -49,18 +49,16 @@ export default function DashboardContent() {
     
     const loadData = async () => {
       try {
-        // 로그인 상태 확인
-        const token = localStorage.getItem("token")
-        setIsLoggedIn(!!token)
-
-        if (token) {
-          // 사용자 정보 로드
-          try {
-            const userData = await userApi.getCurrentUser()
-            setUserInfo(userData)
-          } catch (error) {
-            console.error("사용자 정보 로드 실패:", error)
-          }
+        // 로그인 상태 확인 및 사용자 정보 로드
+        let userLoggedIn = false
+        try {
+          const userData = await userApi.getCurrentUser()
+          setUserInfo(userData)
+          setIsLoggedIn(true)
+          userLoggedIn = true
+        } catch (error) {
+          console.error("사용자 정보 로드 실패:", error)
+          setIsLoggedIn(false)
         }
 
         // 반려견 정보 불러오기 (새로운 저장 방식)
@@ -69,10 +67,15 @@ export default function DashboardContent() {
           setPetInfo(JSON.parse(savedPetInfo))
         }
 
-        // 약 정보 불러오기
-        const savedMedications = getData("medications")
-        if (savedMedications) {
-          setMedications(savedMedications)
+        // 약 정보 불러오기 (API 호출) - 로그인 상태에서만
+        if (userLoggedIn) {
+          try {
+            const medicationData = await medicationApi.getMedications()
+            setMedications(medicationData)
+          } catch (error) {
+            console.error("약물 데이터 로드 실패:", error)
+            setMedications([])
+          }
         }
 
         // 건강 데이터 불러오기
@@ -147,8 +150,25 @@ export default function DashboardContent() {
 
   // 로그인 상태에서 반려견 미등록 시는 대시보드 내에서 처리
 
-  // 오늘 복용할 약 필터링
-  const todayMedications = medications.filter((med: any) => med.isActive)
+  // 오늘 복용할 약 필터링 (현재 날짜가 복용 기간 내이고 오늘이 복용 요일인 약물)
+  const todayMedications = medications.filter((med) => {
+    const today = new Date().toISOString().split('T')[0]
+    const startDate = med.start_date
+    const endDate = med.end_date
+    
+    // 시작날짜 체크
+    if (today < startDate) return false
+    
+    // 종료날짜가 있으면 체크, 없으면 계속 복용
+    if (endDate && today > endDate) return false
+
+    // 오늘이 복용 요일인지 확인
+    const weekdays = ['일', '월', '화', '수', '목', '금', '토']
+    const todayWeekday = weekdays[new Date().getDay()]
+    const weekdaysList = med.weekdays.split(', ').map(day => day.trim())
+    
+    return weekdaysList.includes(todayWeekday)
+  })
 
   // 오늘 날짜 구하기
   const today = new Date()
@@ -398,7 +418,7 @@ export default function DashboardContent() {
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-pink-500" />
                           <span className="text-sm font-medium text-pink-700">
-                            {todayMedications[0].name} • {todayMedications[0].time}
+                            {todayMedications[0].name} • {todayMedications[0].time.substring(0, 5)}
                           </span>
                         </div>
                       </div>

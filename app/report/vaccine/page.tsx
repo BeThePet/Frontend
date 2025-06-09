@@ -6,8 +6,8 @@ import dynamic from 'next/dynamic'
 const VaccineContent = dynamic(() => import('@/components/vaccine/VaccineContent'), {
   ssr: false,
   loading: () => (
-    <div className="min-h-screen bg-beige flex justify-center items-center">
-      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500"></div>
+    <div className="min-h-screen bg-[#FFF8F0] flex justify-center items-center">
+      <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
     </div>
   )
 })

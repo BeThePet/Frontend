@@ -16,7 +16,9 @@ import WeightForm from "@/components/health-record/WeightForm"
 
 export default function HealthRecordPage() {
   const searchParams = useSearchParams()
-  const initialTab = searchParams.get("tab") || "health"
+  const tabParam = searchParams.get("tab") || "health"
+  // daily 파라미터를 health로 매핑
+  const initialTab = tabParam === "daily" ? "health" : tabParam
   const todayOnly = searchParams.get("today") === "true"
 
   const [petInfo, setPetInfo] = useState<any>(null)

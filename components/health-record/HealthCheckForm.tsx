@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { getData, saveData } from "@/lib/storage"
 import { NumberPicker } from "@/components/number-picker"
+import { healthApi, HealthCheckResponse } from "@/lib/api"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
@@ -34,7 +35,6 @@ interface HealthCheckFormData {
     sleep: HealthCheckItem
     temperature: HealthCheckItem
   }
-  memo: string
 }
 
 // 체크 항목 설정
@@ -63,13 +63,12 @@ const checkItemsConfig = [
   },
   {
     id: "stool",
-    label: "배변 상태",
+    label: "배변상태",
     icon: <AlertTriangle className="h-5 w-5" />,
     iconColor: "text-orange-500",
     options: [
       { value: "normal", label: "정상" },
       { value: "soft", label: "무른 변" },
-      { value: "none", label: "안 함" },
       { value: "abnormal", label: "이상 있음" },
     ],
   },
@@ -105,6 +104,7 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [completedToday, setCompletedToday] = useState(false)
   const [petInfo, setPetInfo] = useState<any>(null)
+  const [existingHealthChecks, setExistingHealthChecks] = useState<HealthCheckResponse[]>([]) // 기존 기록들
   const [formData, setFormData] = useState<HealthCheckFormData>({
     items: {
       appetite: { checked: false, value: "normal" },
@@ -113,7 +113,6 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
       sleep: { checked: false, value: 8 },
       temperature: { checked: false, value: 38.5 },
     },
-    memo: "",
   })
 
   // 모든 항목이 체크되었는지 확인
@@ -129,11 +128,67 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
           setPetInfo(savedPetInfo)
         }
 
-        // 로컬 스토리지에서 데이터 로드
-        const savedData = getData<HealthCheckFormData>(`dailyCheck_${date}`)
-        if (savedData) {
-          setFormData(savedData)
-          setCompletedToday(true)
+        // 백엔드에서 오늘 건강체크 데이터 조회
+        try {
+          console.log("오늘 건강체크 데이터 조회 중...")
+          const todayHealthChecks = await healthApi.getTodayHealthChecks()
+          console.log("오늘 건강체크 데이터:", todayHealthChecks)
+          
+          if (todayHealthChecks && todayHealthChecks.length > 0) {
+            console.log("기존 건강체크 데이터 매핑 시작:", todayHealthChecks)
+            setExistingHealthChecks(todayHealthChecks) // 기존 기록 저장
+            
+            // 백엔드 데이터를 폼 데이터로 변환
+            setFormData(prevData => {
+              const updatedFormData = { ...prevData }
+              todayHealthChecks.forEach(check => {
+                const itemKey = getItemKeyFromCategory(check.category)
+                console.log(`매핑: ${check.category} -> ${itemKey}`, check)
+                
+                if (itemKey && updatedFormData.items[itemKey as keyof typeof updatedFormData.items]) {
+                  // 백엔드 상태를 프론트엔드 값으로 역매핑
+                  let frontendValue: string | number = "normal"
+                  
+                  if (check.numeric_value !== null && check.numeric_value !== undefined) {
+                    // 수치 항목 (수면, 체온)
+                    frontendValue = check.numeric_value
+                  } else if (check.status) {
+                    // 상태 항목 (식욕, 활력, 배변) - 백엔드 한글 -> 프론트엔드 영어
+                    if (itemKey === "appetite") {
+                      frontendValue = check.status === "정상" ? "normal" : check.status === "주의" ? "less" : "none"
+                    } else if (itemKey === "energy") {
+                      frontendValue = check.status === "정상" ? "normal" : "less"
+                    } else if (itemKey === "stool") {
+                      frontendValue = check.status === "정상" ? "normal" : check.status === "주의" ? "soft" : "abnormal"
+                    }
+                  }
+                  
+                  updatedFormData.items[itemKey as keyof typeof updatedFormData.items] = {
+                    checked: true,
+                    value: frontendValue,
+                    status: check.status === "정상" ? "normal" : check.status === "이상" ? "danger" : "warning",
+                    note: check.memo || ""
+                  }
+                  
+                  console.log(`${itemKey} 매핑 완료:`, {
+                    백엔드: check,
+                    프론트엔드: updatedFormData.items[itemKey as keyof typeof updatedFormData.items]
+                  })
+                }
+              })
+              return updatedFormData
+            })
+            setCompletedToday(true)
+          }
+        } catch (apiError) {
+          console.warn("건강체크 데이터 조회 실패, 로컬 스토리지 확인:", apiError)
+          
+          // 백엔드 실패시 로컬 스토리지에서 데이터 로드
+          const savedData = getData<HealthCheckFormData>(`dailyCheck_${date}`)
+          if (savedData) {
+            setFormData(savedData)
+            setCompletedToday(true)
+          }
         }
       } catch (error) {
         console.error("건강 체크 데이터 로드 실패:", error)
@@ -144,6 +199,18 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
 
     loadData()
   }, [date])
+
+  // 백엔드 카테고리명을 폼 키로 변환하는 헬퍼 함수
+  const getItemKeyFromCategory = (categoryName: string) => {
+    const mapping: Record<string, string> = {
+      "식욕": "appetite",
+      "활력": "energy", 
+      "배변상태": "stool",
+      "수면": "sleep",
+      "체온": "temperature"
+    }
+    return mapping[categoryName]
+  }
 
   // 상태 변경 핸들러
   const handleStatusChange = (id: string, value: string | number) => {
@@ -188,10 +255,105 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
 
     setIsSubmitting(true)
     try {
-      // 로컬 스토리지에 저장
+      console.log("건강체크 제출 시작 - 전체 생성/수정 모드")
+      console.log("기존 기록 존재:", existingHealthChecks.length > 0)
+      
+      // 전체 생성 또는 전체 수정 결정
+      const isUpdate = existingHealthChecks.length > 0
+      
+      // 각 체크 항목을 백엔드 API로 전송
+      for (const [itemKey, item] of Object.entries(formData.items)) {
+        if (item.checked) {
+          const itemName = checkItemsConfig.find(c => c.id === itemKey)?.label
+          if (itemName) {
+            // 프론트엔드 값을 백엔드 한글 값으로 매핑
+            const getStatus = (value: string | number) => {
+              if (typeof value === "number") return undefined
+              
+              // 각 항목별 상세 매핑
+              if (itemKey === "appetite") {
+                switch (value) {
+                  case "normal": return "정상"
+                  case "less": return "주의"
+                  case "none": return "이상"
+                  default: return "정상"
+                }
+              } else if (itemKey === "energy") {
+                switch (value) {
+                  case "normal": return "정상"
+                  case "less": return "주의"
+                  case "more": return "주의"
+                  default: return "정상"
+                }
+              } else if (itemKey === "stool") {
+                switch (value) {
+                  case "normal": return "정상"
+                  case "soft": return "주의"
+                  case "abnormal": return "이상"
+                  default: return "정상"
+                }
+              }
+              return "정상"
+            }
+            
+            // 백엔드 API 스펙에 맞게 데이터 구성
+            const healthCheckData: any = {
+              category: itemName as "식욕" | "활력" | "배변상태" | "수면" | "체온"
+            }
+
+            // 카테고리별 권장 패턴에 따라 데이터 구성
+            if (itemKey === "sleep" || itemKey === "temperature") {
+              // 수면/체온: numeric_value 권장
+              if (typeof item.value === "number") {
+                healthCheckData.numeric_value = item.value
+                healthCheckData.unit = checkItemsConfig.find(c => c.id === itemKey)?.unit
+              }
+            } else {
+              // 식욕/활력/배변상태: status 권장
+              healthCheckData.status = getStatus(item.value)
+            }
+
+            // 메모가 있으면 추가
+            if (item.note && item.note.trim() !== "") {
+              healthCheckData.memo = item.note.trim()
+            }
+
+            // status 또는 numeric_value 중 하나는 반드시 있어야 함
+            if (!healthCheckData.status && !healthCheckData.numeric_value) {
+              console.warn(`${itemName}: status 또는 numeric_value 중 하나는 필수입니다.`)
+              return // 이 항목은 건너뛰기
+            }
+            
+            console.log(`========= 건강체크 API 호출 =========`)
+            console.log(`항목: ${itemName}`)
+            console.log(`원본 값: ${item.value}`)
+            console.log(`전송 데이터:`, JSON.stringify(healthCheckData, null, 2))
+            console.log(`모드: ${isUpdate ? 'UPDATE' : 'CREATE'}`)
+            
+            if (isUpdate) {
+              // 기존 기록이 있으면 해당 기록을 찾아서 PUT으로 수정
+              const existingRecord = existingHealthChecks.find(record => record.category === itemName)
+              if (existingRecord) {
+                console.log(`기존 기록 ID ${existingRecord.id}로 PUT 요청`)
+                await healthApi.updateHealthCheck(existingRecord.id, healthCheckData)
+              } else {
+                console.log(`기존 기록 없음 - POST 요청으로 생성`)
+                await healthApi.createHealthCheck(healthCheckData)
+              }
+            } else {
+              // 기존 기록이 없으면 POST로 생성
+              console.log(`POST 요청으로 생성`)
+              await healthApi.createHealthCheck(healthCheckData)
+            }
+            console.log(`=====================================`)
+          }
+        }
+      }
+
+      // 성공 시에만 로컬 스토리지에 저장 (백업용)
       saveData(`dailyCheck_${date}`, formData)
 
-      // 건강 데이터에 추가
+      // 건강 데이터에 추가 (기존 로직 유지)
       const healthData = getData("healthData") as any || { activities: [], healthChecks: [] }
       const updatedHealthData = {
         activities: healthData.activities || [],
@@ -240,14 +402,14 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
       setCompletedToday(true)
       toast({
         title: "건강 체크 완료",
-        description: "오늘의 건강 체크가 저장되었습니다.",
+        description: "오늘의 건강 체크 완료! 반려견과 더 건강한 해피라이프!",
       })
       onComplete?.()
     } catch (error) {
       console.error("건강 체크 저장 실패:", error)
       toast({
         title: "저장 실패",
-        description: "건강 체크를 저장하는데 실패했습니다.",
+        description: `건강 체크를 저장하는데 실패했습니다. ${error instanceof Error ? error.message : ''}`,
         variant: "destructive",
       })
     } finally {
@@ -255,18 +417,9 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
     }
   }
 
-  // 폼 초기화
+  // 폼 초기화 (수정 모드로 전환) - 기존 값을 유지
   const resetForm = () => {
-    setFormData({
-      items: {
-        appetite: { checked: false, value: "normal" },
-        energy: { checked: false, value: "normal" },
-        stool: { checked: false, value: "normal" },
-        sleep: { checked: false, value: 8 },
-        temperature: { checked: false, value: 38.5 },
-      },
-      memo: "",
-    })
+    // 현재 저장된 값을 그대로 유지하고 편집 모드로만 전환
     setCompletedToday(false)
   }
 
@@ -297,7 +450,7 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
           <div className="bg-green-50 p-4 rounded-lg mb-4 text-center">
             <p className="text-green-700 font-medium">오늘의 건강 체크를 완료했습니다! 🎉</p>
             <Button variant="outline" className="mt-2" onClick={resetForm}>
-              다시 체크하기
+              건강체크 수정하기
             </Button>
           </div>
         ) : null}
@@ -403,23 +556,6 @@ export default function HealthCheckForm({ petId, date, onComplete }: HealthCheck
               </div>
             )
           })}
-
-          {/* 전체 메모 */}
-          <div className="space-y-2">
-            <Label>전체 메모</Label>
-            <Textarea
-              placeholder="오늘의 건강 상태에 대한 전체적인 메모를 남겨주세요."
-              value={formData.memo}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  memo: e.target.value,
-                }))
-              }
-              className="min-h-[100px]"
-              disabled={completedToday}
-            />
-          </div>
         </div>
 
         {!completedToday && (

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { getData, saveData } from "@/lib/storage"
 import { NumberPicker } from "@/components/number-picker"
+import { healthApi } from "@/lib/api"
 
 interface WeightFormProps {
   petId: string
@@ -34,10 +35,12 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
     weight_kg: 5.0,
   })
   const [weightHistory, setWeightHistory] = useState<WeightHistory[]>([])
+  const [existingRecordId, setExistingRecordId] = useState<number | null>(null)
 
   // today 값을 메모이제이션
   const today = useMemo(() => {
-    return new Date().toISOString().split('T')[0]
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   }, [])
 
   // 초기 데이터 로드
@@ -50,20 +53,48 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
         const savedPetInfo = getData("petInfo")
         if (savedPetInfo && isMounted) {
           setPetInfo(savedPetInfo)
-          setFormData(prev => ({ ...prev, weight_kg: savedPetInfo.weight || 5.0 }))
+          setFormData({ weight_kg: (savedPetInfo as any).weight || 5.0 })
         }
 
-        // 체중 기록 히스토리 불러오기
-        const savedWeightHistory = getData<WeightHistory[]>("weightHistory") || []
+        // 백엔드에서 오늘 체중 기록 조회
+        try {
+          const todayWeights = await healthApi.getWeightRecords()
+          
+          // 오늘 날짜에 해당하는 모든 기록 필터링
+          const todayRecords = todayWeights.filter(record => {
+            const recordDate = record.created_at ? 
+              new Date(record.created_at).toISOString().split('T')[0] : ''
+            return recordDate === today
+          })
+          
+          // 가장 최근에 수정된 기록 선택 (updated_at 기준)
+          const todayWeight = todayRecords.length > 0 ? 
+            todayRecords.reduce((latest, current) => {
+              const latestUpdated = new Date(latest.updated_at || latest.created_at)
+              const currentUpdated = new Date(current.updated_at || current.created_at)
+              return currentUpdated > latestUpdated ? current : latest
+            }) : null
+          
+          if (todayWeight && isMounted) {
+            setFormData({ weight_kg: todayWeight.weight_kg })
+            setExistingRecordId(todayWeight.id)
+            setCompletedToday(true)
+          }
+        } catch (apiError) {
+          console.warn("체중 데이터 조회 실패, 로컬 스토리지 확인:", apiError)
+          
+          // 백엔드 실패시 로컬 스토리지에서 데이터 로드
+          const savedData = getData<WeightData>(`weight_${today}`)
+          if (savedData && isMounted) {
+            setFormData(savedData)
+            setCompletedToday(true)
+          }
+        }
+
+        // 체중 히스토리 로드
+        const savedHistory = getData<WeightHistory[]>("weightHistory") || []
         if (isMounted) {
-          setWeightHistory(savedWeightHistory)
-        }
-
-        // 오늘 체중 기록 확인
-        const savedWeightData = getData<WeightData>(`weight_${today}`)
-        if (savedWeightData && isMounted) {
-          setFormData(savedWeightData)
-          setCompletedToday(true)
+          setWeightHistory(savedHistory)
         }
       } catch (error) {
         console.error("체중 기록 데이터 로드 실패:", error)
@@ -82,9 +113,9 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
   }, [today])
 
   // onChange 핸들러를 useCallback으로 메모이제이션
-  const handleWeightChange = useCallback((value: number) => {
-    setFormData(prev => ({ ...prev, weight_kg: value }))
-  }, [])
+  const handleWeightChange = (value: number) => {
+    setFormData({ weight_kg: value })
+  }
 
   // 폼 제출 핸들러
   const handleSubmit = async () => {
@@ -99,7 +130,27 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
 
     setIsSubmitting(true)
     try {
-      // 로컬 스토리지에 저장
+      // 백엔드 API로 체중 기록 전송
+      const weightData = {
+        weight_kg: formData.weight_kg
+      }
+      
+      try {
+        // 수정인지 신규 등록인지 확인
+        if (existingRecordId) {
+          // 기존 기록이 있으면 PUT으로 수정
+          await healthApi.updateWeightRecord(existingRecordId, weightData)
+        } else {
+          // 기존 기록이 없으면 POST로 신규 등록
+          const newRecord = await healthApi.createWeightRecord(weightData)
+          setExistingRecordId(newRecord.id)
+        }
+      } catch (apiError) {
+        console.error('❌ 체중 기록 API 오류:', apiError)
+        throw apiError // 에러를 다시 던져서 상위 catch에서 처리
+      }
+
+      // 성공 시에만 로컬 스토리지에 저장 (백업용)
       saveData(`weight_${today}`, formData)
 
       // 체중 히스토리 업데이트
@@ -159,8 +210,8 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
       setCompletedToday(true)
       
       toast({
-        title: completedToday ? "체중 기록 수정 완료" : "체중 기록 완료",
-        description: "오늘의 체중이 기록되었습니다.",
+        title: existingRecordId ? "체중 기록 수정 완료" : "체중 기록 완료",
+        description: "체중 기록 성공!",
       })
       
       onComplete?.()
@@ -176,11 +227,9 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
     }
   }
 
-  // 폼 초기화
+  // 폼 초기화 (수정 모드로 전환) - 기존 값을 유지
   const resetForm = () => {
-    setFormData({
-      weight_kg: petInfo?.weight || 5.0,
-    })
+    // 현재 저장된 값을 그대로 유지하고 편집 모드로만 전환
     setCompletedToday(false)
   }
 
@@ -239,7 +288,11 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
               기록 수정하기
             </Button>
           </div>
-        ) : null}
+        ) : (
+          <div className="bg-yellow-50 p-3 rounded-lg mb-4 text-center">
+            <p className="text-yellow-700 text-sm">아직 오늘 체중을 기록하지 않았습니다.</p>
+          </div>
+        )}
 
         <div className="space-y-4 mt-4">
           {/* 체중 입력 */}
