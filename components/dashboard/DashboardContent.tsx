@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge"
 import { getData, saveData } from "@/lib/storage"
 import { LinkButton } from "@/components/ui/link-button"
 import { userApi, medicationApi, dogApi, healthApi, MedicationResponse } from "@/lib/api"
+import PhotoUpload from "../photo-upload"
 
 export default function DashboardContent() {
   const router = useRouter()
@@ -444,23 +445,15 @@ export default function DashboardContent() {
 
         {/* 반려견 프로필 카드 */}
         {petInfo ? (
-          <Link href="/info/detail" className="block">
-            <div className="flex items-center gap-4 mt-4 bg-white p-4 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 hover:shadow-md transition-all duration-200">
+          <div className="mt-4 bg-white p-4 rounded-xl shadow-sm border-2 border-pink-100">
+            <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200">
-                  {petProfileImageUrl && !imageLoadError ? (
-                    <Image
-                      src={petProfileImageUrl}
-                      alt={petInfo.name || "반려견"}
-                      width={80}
-                      height={80}
-                      className="rounded-full object-cover w-full h-full"
-                      onError={() => setImageLoadError(true)}
-                    />
-                  ) : (
-                    <Dog className="w-10 h-10 text-pink-400" />
-                  )}
-                </div>
+                <PhotoUpload
+                  size="md"
+                  initialImage={petProfileImageUrl || undefined}
+                  canEdit={false}
+                  className="w-20 h-20"
+                />
                 {/* 온라인 표시 (선택적) */}
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                   <PawPrint className="w-3 h-3 text-white" />
@@ -492,7 +485,14 @@ export default function DashboardContent() {
                 )}
               </div>
             </div>
-          </Link>
+            
+            {/* 정보 보기 버튼 */}
+            <Link href="/info/detail" className="block mt-3">
+              <Button variant="outline" className="w-full border-pink-200 text-gray-700 hover:bg-pink-50">
+                정보 자세히 보기 →
+              </Button>
+            </Link>
+          </div>
         ) : (
           <Link href="/info" className="block">
             <div className="flex items-center gap-4 mt-4 bg-white p-3 rounded-xl shadow-sm border-2 border-pink-100 hover:border-pink-200 transition-colors">

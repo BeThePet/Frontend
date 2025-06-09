@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 import { ArrowLeft, Edit, Trash2, Dog, Heart, Calendar, Scale, Pill, User } from "lucide-react"
+import PhotoUpload from "../photo-upload"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -252,20 +253,12 @@ export default function PetDetailContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <div className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200 shadow-lg">
-                {petProfileImageUrl && !imageLoadError ? (
-                  <Image
-                    src={petProfileImageUrl}
-                    alt={petInfo.name}
-                    width={96}
-                    height={96}
-                    className="rounded-full object-cover w-full h-full"
-                    onError={() => setImageLoadError(true)}
-                  />
-                ) : (
-                  <Dog className="w-12 h-12 text-pink-400" />
-                )}
-              </div>
+              <PhotoUpload
+                size="lg"
+                initialImage={petProfileImageUrl || undefined}
+                canEdit={false}
+                className="w-24 h-24"
+              />
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-gray-800 mb-1">{petInfo.name}</h3>
                 <p className="text-gray-600 mb-2">{petInfo.breed || getBreedName(petInfo.breedId)}</p>

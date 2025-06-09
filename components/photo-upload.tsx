@@ -14,9 +14,10 @@ interface PhotoUploadProps {
   className?: string
   size?: "sm" | "md" | "lg"
   uploadedImageUrl?: string
+  canEdit?: boolean // 수정/삭제 버튼 표시 여부
 }
 
-export default function PhotoUpload({ initialImage, onImageChange, className = "", size = "md", uploadedImageUrl }: PhotoUploadProps) {
+export default function PhotoUpload({ initialImage, onImageChange, className = "", size = "md", uploadedImageUrl, canEdit = true }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(initialImage || null)
   const [isLoading, setIsLoading] = useState(false)
   const [showImageModal, setShowImageModal] = useState(false)
@@ -68,6 +69,7 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
 
   const handleImageClick = () => {
     if (preview) {
+      console.log('🖼️ 이미지 모달 열기:', preview)
       setShowImageModal(true)
     } else {
       triggerFileInput()
@@ -101,7 +103,18 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
                 exit={{ opacity: 0 }}
                 className="w-full h-full"
               >
-                <Image src={preview || "/placeholder.svg"} alt="Pet photo" fill className="object-cover" />
+                <Image 
+                  src={preview || "/placeholder.svg"} 
+                  alt="Pet photo" 
+                  fill 
+                  className="object-cover" 
+                  onError={(e) => {
+                    console.error('❌ 썸네일 이미지 로딩 실패:', preview)
+                  }}
+                  onLoad={() => {
+                    console.log('✅ 썸네일 이미지 로딩 성공:', preview)
+                  }}
+                />
               </motion.div>
             ) : (
               <motion.div
@@ -163,25 +176,27 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
               onClick={(e) => e.stopPropagation()}
             >
               {/* 상단 버튼들 */}
-              <div className="absolute top-4 left-4 z-10 flex gap-2">
-                <Button
-                  onClick={triggerFileInput}
-                  size="sm"
-                  className="bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg flex items-center gap-2"
-                >
-                  <Edit className="w-4 h-4" />
-                  수정
-                </Button>
-                <Button
-                  onClick={handleRemoveImage}
-                  size="sm"
-                  variant="destructive"
-                  className="bg-red-500/90 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center gap-2"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  삭제
-                </Button>
-              </div>
+              {canEdit && (
+                <div className="absolute top-4 left-4 z-10 flex gap-2">
+                  <Button
+                    onClick={triggerFileInput}
+                    size="sm"
+                    className="bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg flex items-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    수정
+                  </Button>
+                  <Button
+                    onClick={handleRemoveImage}
+                    size="sm"
+                    variant="destructive"
+                    className="bg-red-500/90 hover:bg-red-600 text-white rounded-full shadow-lg flex items-center gap-2"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    삭제
+                  </Button>
+                </div>
+              )}
 
               {/* 닫기 버튼 */}
               <Button
@@ -194,13 +209,20 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
               </Button>
 
               {/* 이미지 */}
-              <div className="relative w-full h-[80vh] rounded-2xl overflow-hidden shadow-2xl">
+              <div className="relative w-full h-[80vh] rounded-2xl overflow-hidden shadow-2xl bg-white">
                 <Image
                   src={preview}
                   alt="Pet photo"
                   fill
                   className="object-contain"
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
+                  priority
+                  onError={(e) => {
+                    console.error('❌ 모달 이미지 로딩 실패:', preview)
+                  }}
+                  onLoad={() => {
+                    console.log('✅ 모달 이미지 로딩 성공:', preview)
+                  }}
                 />
               </div>
             </motion.div>

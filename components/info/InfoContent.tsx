@@ -465,6 +465,17 @@ export default function InfoContent() {
           diseaseIds: updateData.disease_ids
         }
         localStorage.setItem('registeredPetInfo', JSON.stringify(updatedInfo))
+        
+        // 수정 완료 메시지 표시 후 페이지에 머무르기
+        toast({
+          title: "수정 완료!",
+          description: `${result.name}의 정보가 성공적으로 수정되었습니다.`,
+        })
+        
+        setIsSubmitting(false)
+        // 수정 모드에서는 리다이렉트하지 않음
+        return
+        
       } else {
         // 등록 모드: DogCreateRequest 사용 (allergy_ids, disease_ids 선택사항)
         const createData: DogCreateRequest = {
@@ -504,23 +515,25 @@ export default function InfoContent() {
         }
       }
 
-      // 성공 메시지 표시
-      toast({
-        title: isEditMode ? "수정 완료!" : "등록 완료!",
-        description: `${result.name}의 정보가 성공적으로 ${isEditMode ? '수정' : '등록'}되었습니다.`,
-      })
+      // 등록 모드일 때만 성공 메시지 표시 및 리다이렉트
+      if (!isEditMode) {
+        toast({
+          title: "등록 완료!",
+          description: `${result.name}의 정보가 성공적으로 등록되었습니다.`,
+        })
 
-      // 잠시 후 대시보드로 이동
-      setTimeout(() => {
-        setIsSubmitting(false)
-        router.push("/dashboard")
-      }, 1500) // 이미지 업로드 시간 고려하여 조금 더 길게
+        // 잠시 후 대시보드로 이동 (등록 모드일 때만)
+        setTimeout(() => {
+          setIsSubmitting(false)
+          router.push("/dashboard")
+        }, 1500) // 이미지 업로드 시간 고려하여 조금 더 길게
+      }
       
     } catch (error) {
-      console.error("반려견 등록 실패:", error)
+      console.error("반려견 정보 처리 실패:", error)
       toast({
-        title: "등록 실패",
-        description: "반려견 정보 등록에 실패했습니다. 다시 시도해주세요.",
+        title: isEditMode ? "수정 실패" : "등록 실패",
+        description: `반려견 정보 ${isEditMode ? '수정' : '등록'}에 실패했습니다. 다시 시도해주세요.`,
         variant: "destructive",
       })
       setIsSubmitting(false)
