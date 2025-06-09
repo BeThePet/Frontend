@@ -1,4 +1,4 @@
-import { ApiResponse } from '../types'
+import { ApiResponse, HealthRecord, User, Pet, HealthCheckFormData, WalkFormData } from '../types/index'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || ''
 
@@ -41,8 +41,101 @@ export async function fetchApi<T>(
   }
 }
 
-// Food 관련 API 함수들
+// Food 관련 API 함수들 - 백엔드 API 명세서에 맞게 구현
 export const foodApi = {
+  // 사료 전체 조회 (페이지네이션)
+  getProducts: async (params?: {
+    page?: number
+    limit?: number
+    search?: string
+  }) => {
+    const queryParams = new URLSearchParams()
+    if (params?.page) queryParams.append('page', params.page.toString())
+    if (params?.limit) queryParams.append('limit', params.limit.toString())
+    if (params?.search) queryParams.append('search', params.search)
+    
+    const url = `/food/products${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    
+    const response = await fetch(`${API_BASE_URL}${url}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch products')
+    }
+    
+    return response.json()
+  },
+
+  // 사료 상세 조회
+  getProductDetail: async (productId: number) => {
+    const response = await fetch(`${API_BASE_URL}/food/products/${productId}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        throw new Error('제품을 찾을 수 없습니다.')
+      }
+      throw new Error(`Failed to fetch product detail: ${response.status}`)
+    }
+    
+    return response.json()
+  },
+
+  // 새로운 사료 추천 생성
+  getNewRecommendation: async () => {
+    const response = await fetch(`${API_BASE_URL}/food/recommend-current`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // 쿠키 기반 인증
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('반려견 정보를 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to get recommendation')
+    }
+    
+    return response.json()
+  },
+
+  // 최신 추천 기록 조회
+  getLatestRecommendation: async () => {
+    const response = await fetch(`${API_BASE_URL}/food/recommendations/latest`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // 쿠키 기반 인증
+    })
+    
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다.')
+      }
+      if (response.status === 404) {
+        throw new Error('반려견 정보를 찾을 수 없습니다.')
+      }
+      throw new Error('Failed to get latest recommendation')
+    }
+    
+    return response.json()
+  },
+
+  // 기존 호환성을 위한 함수들 (deprecated)
   getFood: (slug: string) => fetchApi(`/api/foods/${slug}`),
   getFoodList: () => fetchApi('/api/foods'),
   searchFoods: (query: string) => fetchApi(`/api/foods/search?q=${query}`),

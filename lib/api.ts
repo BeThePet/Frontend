@@ -162,6 +162,134 @@ export interface DogRegistrationResponse {
   disease_names: string[]
 }
 
+// Food API Types
+export interface FoodProduct {
+  id: number
+  csv_index?: number | null
+  product_name: string | null
+  brand: string | null
+  price: number | null
+  url: string | null
+  ingredients: string | null
+  calorie_content: string | null
+  nutrition: {
+    protein_pct: number | null
+    fat_pct: number | null
+    fiber_pct: number | null
+    moisture_pct: number | null
+    calcium_pct: number | null
+    phosphorus_pct: number | null
+    sodium_pct: number | null
+    omega_6_pct: number | null
+    omega_3_pct: number | null
+  }
+  meta: {
+    is_matched: boolean
+    can_recommend: boolean
+    created_at: string
+    updated_at: string
+  }
+}
+
+export interface FoodProductSummary {
+  id: number
+  product_name: string
+  brand: string
+  price: number
+  is_matched: boolean
+}
+
+export interface PaginationInfo {
+  current_page: number
+  per_page: number
+  total_count: number
+  total_pages: number
+  has_next: boolean
+  has_prev: boolean
+}
+
+export interface FoodProductListResponse {
+  status: string
+  products: FoodProductSummary[]
+  pagination: PaginationInfo
+}
+
+export interface FoodProductDetailResponse {
+  status: string
+  product: FoodProduct
+}
+
+export interface FoodRecommendation {
+  rank: number
+  csv_index: number
+  product_name: string
+  brand: string
+  price: number
+  protein_pct: number | null
+  fat_pct: number | null
+  fiber_pct: number | null
+  moisture_pct: number | null
+  life_stage: string
+  calorie_content: string
+  ingredients: string
+  url: string
+  db_product_id: number | null
+  product_url: string
+  product_image: string | null
+  is_matched: boolean
+  match_method: string | null
+}
+
+export interface PetData {
+  weight_kg: number
+  age_months: number
+  activity_level: string
+  is_neutered: boolean
+  life_stage: string
+  breed_size: string
+  allergies: string[]
+}
+
+export interface RealtimeData {
+  weight_history: Array<{ date: string; weight_kg: number }>
+  intake_history: Array<{ date: string; intake_g: number }>
+  activity_history: Array<{ date: string; minutes: number }>
+  water_history: Array<{ date: string; ml: number }>
+}
+
+export interface RecommendationRequest {
+  pet_data: PetData
+  diseases: string[]
+  realtime_data: RealtimeData
+}
+
+export interface FoodRecommendationResponse {
+  status: string
+  dog_id: number
+  dog_name: string
+  recommendations: {
+    recommendation_id: number
+    request_conditions: RecommendationRequest
+    recommendations: FoodRecommendation[]
+    algorithm_version: string
+    confidence_score: number
+    total_count: number
+  }
+}
+
+export interface LatestRecommendationResponse {
+  status: string
+  dog_id: number
+  dog_name: string
+  has_recommendation: boolean
+  recommendation_id?: number
+  last_recommended_at?: string
+  confidence_score?: number
+  total_recommendations?: number
+  recommendations?: FoodRecommendation[]
+  message?: string
+}
+
 // Emergency API functions
 export const emergencyApi = {
   // Get emergency guides list
