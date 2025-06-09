@@ -31,9 +31,19 @@ export default function SignupPage() {
     }
 
     try {
-      await userApi.signup({ email, nickname, password })
-      alert("회원가입이 완료되었습니다. 로그인해주세요.")
-      router.push("/login")
+      const result = await userApi.signup({ email, nickname, password })
+      
+      if (result.success) {
+        // 회원가입 성공 - 기존 로컬스토리지 데이터 정리
+        localStorage.removeItem('registeredPetInfo')
+        localStorage.removeItem('userInfo')
+        
+        // 백엔드에서 쿠키 자동 설정되므로 바로 대시보드로 이동
+        alert("회원가입이 완료되었습니다! 환영합니다! 🎉")
+        router.push("/dashboard")
+      } else {
+        setError(result.error || "회원가입 중 오류가 발생했습니다.")
+      }
     } catch (error) {
       console.error("회원가입 실패:", error)
       setError("회원가입 중 오류가 발생했습니다. 다시 시도해주세요.")

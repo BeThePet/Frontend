@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
-import { medicationApi, MedicationRequest, MedicationResponse } from "@/lib/api"
+import { medicationApi, dogApi, MedicationRequest, MedicationResponse } from "@/lib/api"
 import { getData } from "@/lib/storage"
 import { scheduleNotification, cancelNotification } from "@/lib/notification"
 
@@ -23,6 +23,8 @@ export default function MedicationContent() {
   const [medications, setMedications] = useState<MedicationResponse[]>([])
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoadingPetInfo, setIsLoadingPetInfo] = useState(true)
+  const [hasPetInfo, setHasPetInfo] = useState(false)
   const [newMedication, setNewMedication] = useState<MedicationRequest>({
     name: "",
     dosage: "",
@@ -48,14 +50,44 @@ export default function MedicationContent() {
   ]
 
   useEffect(() => {
-    // 반려견 정보 불러오기
-    const savedPetInfo = getData("petInfo")
-    if (savedPetInfo) {
-      setPetInfo(savedPetInfo)
+    const loadData = async () => {
+      setIsLoadingPetInfo(true)
+      try {
+        // 백엔드에서 반려견 정보 확인
+        const dogInfo = await dogApi.getDogInfo()
+        if (dogInfo) {
+          setPetInfo(dogInfo)
+          setHasPetInfo(true)
+          // 약 정보 불러오기
+          loadMedications()
+        } else {
+          // 로컬 스토리지 확인
+          const savedPetInfo = getData("petInfo")
+          if (savedPetInfo) {
+            setPetInfo(savedPetInfo)
+            setHasPetInfo(true)
+            loadMedications()
+          } else {
+            setHasPetInfo(false)
+          }
+        }
+      } catch (error) {
+        console.error("반려견 정보 확인 실패:", error)
+        // 백엔드 실패 시 로컬스토리지 확인
+        const savedPetInfo = getData("petInfo")
+        if (savedPetInfo) {
+          setPetInfo(savedPetInfo)
+          setHasPetInfo(true)
+          loadMedications()
+        } else {
+          setHasPetInfo(false)
+        }
+      } finally {
+        setIsLoadingPetInfo(false)
+      }
     }
 
-    // 약 정보 불러오기
-    loadMedications()
+    loadData()
 
     // 현재 날짜 설정
     const today = new Date()
@@ -380,6 +412,48 @@ export default function MedicationContent() {
     const todayWeekday = getTodayWeekday()
     const weekdaysList = weekdaysString.split(', ').map(day => day.trim())
     return weekdaysList.includes(todayWeekday)
+  }
+
+  // 반려견 정보 로딩 중
+  if (isLoadingPetInfo) {
+    return (
+      <div className="min-h-screen bg-beige flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">반려견 정보를 확인하고 있습니다...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 반려견 정보가 없을 때
+  if (!hasPetInfo) {
+    return (
+      <div className="min-h-screen bg-beige">
+        <div className="bg-blue-light p-4 flex items-center">
+          <Link href="/dashboard" className="text-gray-800">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <h1 className="text-xl font-bold text-gray-800 ml-4">약 복용 관리</h1>
+        </div>
+        
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-blue-100 max-w-md">
+            <Pill className="w-16 h-16 text-blue-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">등록된 반려견이 없습니다</h2>
+            <p className="text-gray-600 mb-6">
+              약 복용 관리를 하려면<br />
+              먼저 반려견 정보를 등록해주세요.
+            </p>
+            <Link href="/info">
+              <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl">
+                반려견 등록하기
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

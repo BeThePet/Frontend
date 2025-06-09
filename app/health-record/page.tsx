@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Activity } from "lucide-react"
 import { motion } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSearchParams } from "next/navigation"
 import { getData } from "@/lib/storage"
@@ -25,22 +26,29 @@ export default function HealthRecordPage() {
   const [petInfo, setPetInfo] = useState<any>(null)
   const [date, setDate] = useState<string>("")
   const [activeTab, setActiveTab] = useState(initialTab)
+  const [isLoading, setIsLoading] = useState(true)
+  const [hasPetInfo, setHasPetInfo] = useState(false)
 
   // 초기 데이터 로드
   useEffect(() => {
     const loadData = async () => {
+      setIsLoading(true)
       try {
         // 백엔드에서 반려견 정보 불러오기
         const backendPetInfo = await dogApi.getDogInfo()
         if (backendPetInfo) {
           setPetInfo(backendPetInfo)
+          setHasPetInfo(true)
           console.log('건강기록 페이지: 백엔드에서 반려견 정보 가져옴')
         } else {
           // 백엔드에서 반려견 정보가 없으면 로컬 스토리지 확인
           const savedPetInfo = getData("petInfo")
           if (savedPetInfo) {
             setPetInfo(savedPetInfo)
+            setHasPetInfo(true)
             console.log('건강기록 페이지: 로컬 스토리지에서 반려견 정보 가져옴')
+          } else {
+            setHasPetInfo(false)
           }
         }
       } catch (error) {
@@ -49,8 +57,13 @@ export default function HealthRecordPage() {
         const savedPetInfo = getData("petInfo")
         if (savedPetInfo) {
           setPetInfo(savedPetInfo)
+          setHasPetInfo(true)
           console.log('건강기록 페이지: API 실패로 로컬 스토리지 사용')
+        } else {
+          setHasPetInfo(false)
         }
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -62,10 +75,44 @@ export default function HealthRecordPage() {
     setDate(formattedDate)
   }, [])
 
-  if (!petInfo) {
+  // 로딩 중
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-pink-50 flex items-center justify-center">
-        <p className="text-gray-600">반려견 정보를 불러오는 중...</p>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">반려견 정보를 확인하고 있습니다...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 반려견 정보가 없을 때
+  if (!hasPetInfo) {
+    return (
+      <div className="min-h-screen bg-pink-50">
+        <div className="bg-pink-200 p-4 flex items-center">
+          <Link href="/dashboard" className="text-gray-800">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <h1 className="text-xl font-bold text-gray-800 ml-4">{todayOnly ? "오늘의 기록" : "건강기록"}</h1>
+        </div>
+        
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-pink-100 max-w-md">
+            <Activity className="w-16 h-16 text-pink-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">등록된 반려견이 없습니다</h2>
+            <p className="text-gray-600 mb-6">
+              건강 기록을 작성하려면<br />
+              먼저 반려견 정보를 등록해주세요.
+            </p>
+            <Link href="/info">
+              <Button className="w-full bg-pink-500 hover:bg-pink-600 text-white rounded-xl">
+                반려견 등록하기
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }

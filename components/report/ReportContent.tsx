@@ -35,6 +35,7 @@ import {
   reportApi, 
   healthApi,
   medicationApi,
+  dogApi,
   type ComprehensiveReportResponse, 
   type HealthInsightResponse, 
   type ActivityStatsResponse, 
@@ -50,6 +51,7 @@ export default function ReportContent() {
   const [timeRange, setTimeRange] = useState<'week' | 'month' | 'all'>("week")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasPetInfo, setHasPetInfo] = useState<boolean | null>(null) // null: 확인 중, true: 있음, false: 없음
   const { toast } = useToast()
 
   // API 데이터 상태
@@ -64,7 +66,7 @@ export default function ReportContent() {
 
   useEffect(() => {
     setMounted(true)
-    loadReportData()
+    checkPetInfoAndLoadData()
     // 약물 데이터 로드 임시 비활성화 (리포트 테스트용)
     // loadMedicationData().catch(err => {
     //   console.warn("약물 데이터 로드를 건너뜁니다:", err)
@@ -72,10 +74,33 @@ export default function ReportContent() {
   }, [])
 
   useEffect(() => {
-    if (mounted) {
+    if (mounted && hasPetInfo) {
       loadReportData()
     }
-  }, [timeRange, mounted])
+  }, [timeRange, mounted, hasPetInfo])
+
+  const checkPetInfoAndLoadData = async () => {
+    try {
+      // 먼저 반려견 정보가 있는지 확인
+      const dogInfo = await dogApi.getDogInfo()
+      if (dogInfo) {
+        setHasPetInfo(true)
+        loadReportData()
+      } else {
+        setHasPetInfo(false)
+      }
+    } catch (error) {
+      console.error("반려견 정보 확인 실패:", error)
+      // 백엔드 실패 시 로컬스토리지 확인
+      const savedPetInfo = localStorage.getItem('registeredPetInfo')
+      if (savedPetInfo) {
+        setHasPetInfo(true)
+        loadReportData()
+      } else {
+        setHasPetInfo(false)
+      }
+    }
+  }
 
   const loadMedicationData = async () => {
     try {
@@ -163,6 +188,48 @@ export default function ReportContent() {
     return (
       <div className="min-h-screen bg-pink-50 flex justify-center items-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500"></div>
+      </div>
+    )
+  }
+
+  // 반려견 정보 확인 중
+  if (hasPetInfo === null) {
+    return (
+      <div className="min-h-screen bg-pink-50 flex justify-center items-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-pink-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">반려견 정보를 확인하고 있습니다...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // 반려견 정보가 없을 때
+  if (hasPetInfo === false) {
+    return (
+      <div className="min-h-screen bg-pink-50">
+        <div className="bg-pink-200 p-4 flex items-center">
+          <Link href="/dashboard" className="text-gray-800">
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <h1 className="text-xl font-bold text-gray-800 ml-4">건강 리포트</h1>
+        </div>
+        
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-pink-100 max-w-md">
+            <BarChart className="w-16 h-16 text-pink-400 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-gray-800 mb-2">등록된 반려견이 없습니다</h2>
+            <p className="text-gray-600 mb-6">
+              건강 리포트를 확인하려면<br />
+              먼저 반려견 정보를 등록해주세요.
+            </p>
+            <Link href="/info">
+              <Button className="w-full bg-pink-500 hover:bg-pink-600 text-white rounded-xl">
+                반려견 등록하기
+              </Button>
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }
