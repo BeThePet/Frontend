@@ -53,17 +53,6 @@ export function saveData(key: string, data: any): boolean {
   return false
 }
 
-// 개발용 목데이터
-export const MOCK_PET_INFO = {
-  id: "pet-001",
-  name: "멍멍이",
-  breed: "말티즈",
-  birthDate: "2020-01-01",
-  gender: "female",
-  weight: 3.5,
-  imageUrl: "/images/pet-placeholder.png"
-}
-
 /**
  * 로컬 스토리지에서 데이터를 가져옵니다.
  * @param key 저장된 데이터의 키
@@ -71,11 +60,6 @@ export const MOCK_PET_INFO = {
  */
 export function getData<T>(key: string): T | null {
   try {
-    // 개발 환경에서 petInfo 요청 시 목데이터 반환
-    if (key === "petInfo") {
-      return MOCK_PET_INFO as T
-    }
-    
     const item = localStorage.getItem(key)
     return item ? JSON.parse(item) : null
   } catch (error) {

@@ -23,17 +23,55 @@ export default function PetDetailContent() {
       try {
         setLoading(true)
         
-        // 기존 반려견 정보 복원
-        const savedPetInfo = localStorage.getItem('registeredPetInfo')
-        if (savedPetInfo) {
-          setPetInfo(JSON.parse(savedPetInfo))
-        } else {
-          // 반려견 정보가 없으면 등록 페이지로 리디렉션
-          router.push('/info')
-          return
+        // 1순위: 백엔드에서 반려견 정보 가져오기
+        try {
+          const dogInfo = await dogApi.getDogInfo()
+          if (dogInfo) {
+            // 백엔드 응답을 프론트엔드 형태로 변환
+            const petData = {
+              id: dogInfo.id,
+              name: dogInfo.name,
+              birthday: dogInfo.birth_date,
+              breedId: null, // breed_name을 통해 breed_id 찾기 필요
+              gender: dogInfo.gender,
+              weight: dogInfo.weight,
+              ageGroup: dogInfo.age_group,
+              medicine: dogInfo.medication,
+              breed: dogInfo.breed_name,
+              allergyIds: [], // 나중에 name을 통해 id 찾기
+              diseaseIds: [], // 나중에 name을 통해 id 찾기
+              allergy_names: dogInfo.allergy_names,
+              disease_names: dogInfo.disease_names
+            }
+            setPetInfo(petData)
+            
+            // 백엔드 데이터를 localStorage에도 백업 저장
+            localStorage.setItem('registeredPetInfo', JSON.stringify(petData))
+          } else {
+            // 백엔드에 반려견 정보가 없으면 localStorage 확인
+            const savedPetInfo = localStorage.getItem('registeredPetInfo')
+            if (savedPetInfo) {
+              setPetInfo(JSON.parse(savedPetInfo))
+            } else {
+              // 반려견 정보가 없으면 등록 페이지로 리디렉션
+              router.push('/info')
+              return
+            }
+          }
+        } catch (error) {
+          console.error('백엔드에서 반려견 정보 로드 실패:', error)
+          // 2순위: localStorage에서 반려견 정보 복원
+          const savedPetInfo = localStorage.getItem('registeredPetInfo')
+          if (savedPetInfo) {
+            setPetInfo(JSON.parse(savedPetInfo))
+          } else {
+            // 반려견 정보가 없으면 등록 페이지로 리디렉션
+            router.push('/info')
+            return
+          }
         }
 
-        // API 데이터 로드
+        // API 데이터 로드 (품종, 알레르기, 질병 옵션들)
         const [breedsData, allergiesData, diseasesData] = await Promise.all([
           dogApi.getBreeds(),
           dogApi.getAllergies(),
@@ -82,11 +120,11 @@ export default function PetDetailContent() {
     try {
       setLoading(true)
       
-      // Mock 삭제 처리
-      localStorage.removeItem('registeredPetInfo')
+      // 실제 백엔드 API 호출
+      await dogApi.deleteDog()
       
-      // 실제 백엔드 연결 시 사용할 코드
-      // await dogApi.deleteDog(petInfo.id)
+      // 로컬스토리지에서도 삭제 (테스트용)
+      localStorage.removeItem('registeredPetInfo')
       
       alert('반려견 정보가 삭제되었습니다.')
       router.push('/dashboard')

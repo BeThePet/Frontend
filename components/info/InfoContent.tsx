@@ -15,7 +15,8 @@ import {
   type BreedOption, 
   type AllergyCategory, 
   type DiseaseCategory,
-  type DogRegistrationRequest,
+  type DogCreateRequest,
+  type DogUpdateRequest,
   type DogRegistrationResponse
 } from "@/lib/api"
 
@@ -75,34 +76,134 @@ export default function InfoContent() {
         setAllergyCategories(allergiesData)
         setDiseaseCategories(diseasesData)
         
-        // 수정 모드일 때만 기존 데이터 로드
-        if (mode === 'edit') {
-          const savedPetInfo = localStorage.getItem('registeredPetInfo')
-          if (savedPetInfo) {
-            const existingDogInfo = JSON.parse(savedPetInfo)
-            setPetInfo({
-              name: existingDogInfo.name || "",
-              birthday: existingDogInfo.birthday || "",
-              breedId: existingDogInfo.breedId || null,
-              gender: existingDogInfo.gender || "",
-              weight: existingDogInfo.weight?.toString() || "",
-              ageGroup: existingDogInfo.ageGroup || "성견",
-              medicine: existingDogInfo.medicine || "",
-              photoUrl: existingDogInfo.photoUrl || "",
-              neutered: existingDogInfo.neutered || null,
-            })
-            
-            // 알레르기와 질병 ID 복원
-            if (existingDogInfo.allergyIds) {
-              setSelectedAllergies(new Set(existingDogInfo.allergyIds))
+        // 일반 등록 모드에서도 기존 반려견이 있는지 확인
+        if (mode !== 'edit') {
+          try {
+            const dogInfo = await dogApi.getDogInfo()
+            if (dogInfo) {
+              // 이미 등록된 반려견이 있으면 상세 페이지로 리디렉션
+              toast({
+                title: "이미 등록된 반려견이 있습니다",
+                description: "반려견 정보를 확인하거나 수정하시겠습니까?",
+              })
+              router.push('/info/detail')
+              return
             }
-            if (existingDogInfo.diseaseIds) {
-              setSelectedDiseases(new Set(existingDogInfo.diseaseIds))
-            }
+          } catch (error) {
+            // 404나 기타 오류는 무시하고 계속 진행 (새 등록)
+            console.log("반려견 정보 없음 - 새로 등록 가능")
           }
         }
         
-
+        // 수정 모드일 때만 기존 데이터 로드
+        if (mode === 'edit') {
+          try {
+            // 실제 백엔드에서 반려견 정보 가져오기
+            const dogInfo = await dogApi.getDogInfo()
+            
+            if (dogInfo) {
+              // 백엔드 응답을 프론트엔드 폼 데이터로 변환
+              setPetInfo({
+                name: dogInfo.name || "",
+                birthday: dogInfo.birth_date || "",
+                breedId: null, // breed_name에서 breed_id를 찾아야 함
+                gender: dogInfo.gender || "",
+                weight: dogInfo.weight?.toString() || "",
+                ageGroup: dogInfo.age_group || "성견",
+                medicine: dogInfo.medication || "",
+                photoUrl: "", // 추후 photo_url 필드 추가 시 사용
+                neutered: null,
+              })
+              
+              // breed_name을 통해 breed_id 찾기
+              let foundBreed: BreedOption | undefined = undefined
+              if (dogInfo.breed_name && breedsData.length > 0) {
+                foundBreed = breedsData.find(breed => breed.name === dogInfo.breed_name)
+                if (foundBreed) {
+                  setPetInfo(prev => ({ ...prev, breedId: foundBreed!.id }))
+                }
+              }
+              
+              // allergy_names를 통해 allergy_ids 찾기
+              const allergyIds: number[] = []
+              if (dogInfo.allergy_names && dogInfo.allergy_names.length > 0) {
+                allergiesData.forEach(category => {
+                  category.items.forEach(item => {
+                    if (dogInfo.allergy_names.includes(item.name)) {
+                      allergyIds.push(item.id)
+                    }
+                  })
+                })
+                setSelectedAllergies(new Set(allergyIds))
+              }
+              
+              // disease_names를 통해 disease_ids 찾기
+              const diseaseIds: number[] = []
+              if (dogInfo.disease_names && dogInfo.disease_names.length > 0) {
+                diseasesData.forEach(category => {
+                  category.items.forEach(item => {
+                    if (dogInfo.disease_names.includes(item.name)) {
+                      diseaseIds.push(item.id)
+                    }
+                  })
+                })
+                setSelectedDiseases(new Set(diseaseIds))
+              }
+              
+              // 백엔드 데이터를 localStorage에도 백업 저장
+              const backupInfo = {
+                id: dogInfo.id,
+                name: dogInfo.name,
+                birthday: dogInfo.birth_date,
+                breedId: foundBreed?.id || null,
+                gender: dogInfo.gender,
+                weight: dogInfo.weight,
+                ageGroup: dogInfo.age_group,
+                medicine: dogInfo.medication,
+                allergyIds: Array.from(new Set(allergyIds)),
+                diseaseIds: Array.from(new Set(diseaseIds))
+              }
+              localStorage.setItem('registeredPetInfo', JSON.stringify(backupInfo))
+              
+            } else {
+              // 백엔드에 반려견 정보가 없으면 등록 페이지로 리디렉션
+              toast({
+                title: "반려견 정보를 찾을 수 없습니다",
+                description: "먼저 반려견을 등록해주세요.",
+                variant: "destructive",
+              })
+              router.push('/info')
+              return
+            }
+            
+          } catch (error) {
+            console.error("백엔드에서 반려견 정보 로드 실패:", error)
+            // 백엔드 실패 시 localStorage에서 데이터 로드 시도
+            const savedPetInfo = localStorage.getItem('registeredPetInfo')
+            if (savedPetInfo) {
+              const existingDogInfo = JSON.parse(savedPetInfo)
+              setPetInfo({
+                name: existingDogInfo.name || "",
+                birthday: existingDogInfo.birthday || "",
+                breedId: existingDogInfo.breedId || null,
+                gender: existingDogInfo.gender || "",
+                weight: existingDogInfo.weight?.toString() || "",
+                ageGroup: existingDogInfo.ageGroup || "성견",
+                medicine: existingDogInfo.medicine || "",
+                photoUrl: existingDogInfo.photoUrl || "",
+                neutered: existingDogInfo.neutered || null,
+              })
+              
+              // 알레르기와 질병 ID 복원
+              if (existingDogInfo.allergyIds) {
+                setSelectedAllergies(new Set(existingDogInfo.allergyIds))
+              }
+              if (existingDogInfo.diseaseIds) {
+                setSelectedDiseases(new Set(existingDogInfo.diseaseIds))
+              }
+            }
+          }
+        }
         
       } catch (error) {
         console.error("데이터 로드 실패:", error)
@@ -119,9 +220,40 @@ export default function InfoContent() {
     loadData()
   }, [])
 
+  // 생년월일 기반 연령대 자동 계산 함수
+  const calculateAgeGroup = (birthDate: string): "주니어" | "성견" | "시니어" => {
+    if (!birthDate) return "성견"
+    
+    const birth = new Date(birthDate)
+    const today = new Date()
+    let age = today.getFullYear() - birth.getFullYear()
+    
+    if (
+      today.getMonth() < birth.getMonth() ||
+      (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())
+    ) {
+      age--
+    }
+    
+    if (age < 1) return "주니어"
+    if (age >= 7) return "시니어"
+    return "성견"
+  }
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target
-    setPetInfo((prev) => ({ ...prev, [id]: value }))
+    
+    // 생일이 변경되면 연령대 자동 계산 (사용자가 수동으로 선택하지 않은 경우)
+    if (id === "birthday") {
+      const autoAgeGroup = calculateAgeGroup(value)
+      setPetInfo((prev) => ({ 
+        ...prev, 
+        [id]: value,
+        ageGroup: autoAgeGroup // 자동으로 연령대 설정
+      }))
+    } else {
+      setPetInfo((prev) => ({ ...prev, [id]: value }))
+    }
   }
 
   const handleGenderSelect = (gender: string) => {
@@ -172,11 +304,11 @@ export default function InfoContent() {
     e.preventDefault()
     setIsSubmitting(true)
 
-    // 필수 필드 검증
-    if (!petInfo.name || !petInfo.birthday || !petInfo.breedId || !petInfo.gender) {
+    // 필수 필드 검증 (체중 추가)
+    if (!petInfo.name || !petInfo.birthday || !petInfo.breedId || !petInfo.gender || !petInfo.weight) {
       toast({
         title: "필수 정보를 입력해주세요",
-        description: "이름, 생일, 품종, 성별은 필수 입력 항목입니다.",
+        description: "이름, 생일, 품종, 성별, 체중은 필수 입력 항목입니다.",
         variant: "destructive",
       })
       setIsSubmitting(false)
@@ -184,46 +316,51 @@ export default function InfoContent() {
     }
 
     try {
-      // 백엔드 API 요청 데이터 구성
-      const requestData: DogRegistrationRequest = {
-        name: petInfo.name,
-        birth_date: petInfo.birthday,
-        age_group: petInfo.ageGroup,
-        weight: parseFloat(petInfo.weight) || 5.0,
-        breed_id: petInfo.breedId,
-        gender: petInfo.gender as "남아" | "여아" | "중성화",
-        medication: petInfo.medicine || null,
-        allergy_ids: Array.from(selectedAllergies),
-        disease_ids: Array.from(selectedDiseases)
-      }
-
       let result
       if (isEditMode) {
-        // 수정 모드: 기존 정보 업데이트
-        const savedPetInfo = localStorage.getItem('registeredPetInfo')
-        const existingInfo = savedPetInfo ? JSON.parse(savedPetInfo) : {}
-        
-        const updatedInfo = {
-          ...existingInfo,
-          ...requestData,
-          allergyIds: requestData.allergy_ids,
-          diseaseIds: requestData.disease_ids
+        // 수정 모드: DogUpdateRequest 사용 (allergy_ids, disease_ids 필수)
+        const updateData: DogUpdateRequest = {
+          name: petInfo.name,
+          birth_date: petInfo.birthday,
+          age_group: petInfo.ageGroup,
+          weight: parseFloat(petInfo.weight),
+          breed_id: petInfo.breedId,
+          gender: petInfo.gender as "남아" | "여아" | "중성화",
+          medication: petInfo.medicine || null,
+          allergy_ids: Array.from(selectedAllergies),  // 필수
+          disease_ids: Array.from(selectedDiseases)    // 필수
         }
         
-        localStorage.setItem('registeredPetInfo', JSON.stringify(updatedInfo))
-        result = updatedInfo
+        result = await dogApi.updateDog(updateData)
         
-        // 실제 백엔드 연결 시 사용할 코드
-        // result = await dogApi.updateDog(existingInfo.id, requestData)
+        // 로컬스토리지에도 저장 (테스트용)
+        const updatedInfo = {
+          ...updateData,
+          allergyIds: updateData.allergy_ids,
+          diseaseIds: updateData.disease_ids
+        }
+        localStorage.setItem('registeredPetInfo', JSON.stringify(updatedInfo))
       } else {
-        // 등록 모드: 새 반려견 정보 등록
-        result = await dogApi.registerDog(requestData)
+        // 등록 모드: DogCreateRequest 사용 (allergy_ids, disease_ids 선택사항)
+        const createData: DogCreateRequest = {
+          name: petInfo.name,
+          birth_date: petInfo.birthday,
+          age_group: petInfo.ageGroup,
+          weight: parseFloat(petInfo.weight),
+          breed_id: petInfo.breedId,
+          gender: petInfo.gender as "남아" | "여아" | "중성화",
+          medication: petInfo.medicine || null,
+          allergy_ids: Array.from(selectedAllergies),  // 선택사항이지만 값 전달
+          disease_ids: Array.from(selectedDiseases)    // 선택사항이지만 값 전달
+        }
+        
+        result = await dogApi.registerDog(createData)
         
         // 로컬스토리지에도 저장 (테스트용)
         const savedInfo = {
-          ...requestData,
-          allergyIds: requestData.allergy_ids,
-          diseaseIds: requestData.disease_ids
+          ...createData,
+          allergyIds: createData.allergy_ids,
+          diseaseIds: createData.disease_ids
         }
         localStorage.setItem('registeredPetInfo', JSON.stringify(savedInfo))
       }
@@ -365,6 +502,7 @@ export default function InfoContent() {
                   className="input-field w-full"
                   value={petInfo.weight}
                   onChange={handleChange}
+                  required
                 />
               </div>
 

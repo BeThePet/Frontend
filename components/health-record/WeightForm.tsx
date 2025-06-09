@@ -8,10 +8,11 @@ import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { getData, saveData } from "@/lib/storage"
 import { NumberPicker } from "@/components/number-picker"
-import { healthApi } from "@/lib/api"
+import { healthApi, dogApi } from "@/lib/api"
 
 interface WeightFormProps {
   petId: string
+  petInfo?: any // 대시보드에서 전달받은 반려견 정보
   onComplete?: () => void
 }
 
@@ -25,7 +26,7 @@ interface WeightHistory {
   time: string
 }
 
-export default function WeightForm({ petId, onComplete }: WeightFormProps) {
+export default function WeightForm({ petId, petInfo: initialPetInfo, onComplete }: WeightFormProps) {
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -49,11 +50,18 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
 
     const loadData = async () => {
       try {
-        // 반려견 정보 불러오기
-        const savedPetInfo = getData("petInfo")
-        if (savedPetInfo && isMounted) {
-          setPetInfo(savedPetInfo)
-          setFormData({ weight_kg: (savedPetInfo as any).weight || 5.0 })
+        // 대시보드에서 전달받은 반려견 정보 사용 (API 호출 없음)
+        let petWeight = 5.0 // 기본값
+        
+        if (initialPetInfo && isMounted) {
+          setPetInfo(initialPetInfo)
+          petWeight = initialPetInfo.weight || 5.0
+          console.log('전달받은 반려견 체중 정보 사용:', petWeight, 'kg')
+        }
+        
+        // 초기 체중값 설정
+        if (isMounted) {
+          setFormData({ weight_kg: petWeight })
         }
 
         // 백엔드에서 오늘 체중 기록 조회
@@ -61,7 +69,7 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
           const todayWeights = await healthApi.getWeightRecords()
           
           // 오늘 날짜에 해당하는 모든 기록 필터링
-          const todayRecords = todayWeights.filter(record => {
+          const todayRecords = todayWeights.filter((record: any) => {
             const recordDate = record.created_at ? 
               new Date(record.created_at).toISOString().split('T')[0] : ''
             return recordDate === today
@@ -69,7 +77,7 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
           
           // 가장 최근에 수정된 기록 선택 (updated_at 기준)
           const todayWeight = todayRecords.length > 0 ? 
-            todayRecords.reduce((latest, current) => {
+            todayRecords.reduce((latest: any, current: any) => {
               const latestUpdated = new Date(latest.updated_at || latest.created_at)
               const currentUpdated = new Date(current.updated_at || current.created_at)
               return currentUpdated > latestUpdated ? current : latest
@@ -79,22 +87,15 @@ export default function WeightForm({ petId, onComplete }: WeightFormProps) {
             setFormData({ weight_kg: todayWeight.weight_kg })
             setExistingRecordId(todayWeight.id)
             setCompletedToday(true)
+            console.log('오늘 체중 기록 있음:', todayWeight.weight_kg, 'kg')
+          } else if (isMounted) {
+            // 오늘 기록이 없으면 반려견 정보의 체중을 초기값으로 유지
+            console.log('오늘 체중 기록 없음, 반려견 정보 체중 사용:', petWeight, 'kg')
           }
         } catch (apiError) {
-          console.warn("체중 데이터 조회 실패, 로컬 스토리지 확인:", apiError)
-          
-          // 백엔드 실패시 로컬 스토리지에서 데이터 로드
-          const savedData = getData<WeightData>(`weight_${today}`)
-          if (savedData && isMounted) {
-            setFormData(savedData)
-            setCompletedToday(true)
-          }
-        }
-
-        // 체중 히스토리 로드
-        const savedHistory = getData<WeightHistory[]>("weightHistory") || []
-        if (isMounted) {
-          setWeightHistory(savedHistory)
+          console.error("체중 데이터 조회 실패:", apiError)
+          // 백엔드 실패 시에도 반려견 정보의 체중을 유지
+          console.log('오늘 체중 기록 조회 실패, 반려견 정보 체중 유지:', petWeight, 'kg')
         }
       } catch (error) {
         console.error("체중 기록 데이터 로드 실패:", error)

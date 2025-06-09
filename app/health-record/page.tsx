@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useSearchParams } from "next/navigation"
 import { getData } from "@/lib/storage"
+import { dogApi } from "@/lib/api"
 import HealthCheckForm from "@/components/health-record/HealthCheckForm"
 import WalkForm from "@/components/health-record/WalkForm"
 import FeedForm from "@/components/health-record/FeedForm"
@@ -27,11 +28,33 @@ export default function HealthRecordPage() {
 
   // 초기 데이터 로드
   useEffect(() => {
-    // 반려견 정보 불러오기
-    const savedPetInfo = getData("petInfo")
-    if (savedPetInfo) {
-      setPetInfo(savedPetInfo)
+    const loadData = async () => {
+      try {
+        // 백엔드에서 반려견 정보 불러오기
+        const backendPetInfo = await dogApi.getDogInfo()
+        if (backendPetInfo) {
+          setPetInfo(backendPetInfo)
+          console.log('건강기록 페이지: 백엔드에서 반려견 정보 가져옴')
+        } else {
+          // 백엔드에서 반려견 정보가 없으면 로컬 스토리지 확인
+          const savedPetInfo = getData("petInfo")
+          if (savedPetInfo) {
+            setPetInfo(savedPetInfo)
+            console.log('건강기록 페이지: 로컬 스토리지에서 반려견 정보 가져옴')
+          }
+        }
+      } catch (error) {
+        console.error('건강기록 페이지: 반려견 정보 조회 실패:', error)
+        // API 실패 시 로컬 스토리지 백업 사용
+        const savedPetInfo = getData("petInfo")
+        if (savedPetInfo) {
+          setPetInfo(savedPetInfo)
+          console.log('건강기록 페이지: API 실패로 로컬 스토리지 사용')
+        }
+      }
     }
+
+    loadData()
 
     // 현재 날짜 설정
     const today = new Date()
@@ -144,6 +167,7 @@ export default function HealthRecordPage() {
           <TabsContent value="weight" className="mt-4">
             <WeightForm
               petId={petInfo.id}
+              petInfo={petInfo}
               onComplete={() => {
                 // 필요한 경우 추가 작업 수행
               }}

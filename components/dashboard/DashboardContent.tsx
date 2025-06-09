@@ -30,7 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { getData, saveData } from "@/lib/storage"
 import { LinkButton } from "@/components/ui/link-button"
-import { userApi, medicationApi, MedicationResponse } from "@/lib/api"
+import { userApi, medicationApi, dogApi, healthApi, MedicationResponse } from "@/lib/api"
 
 export default function DashboardContent() {
   const router = useRouter()
@@ -42,6 +42,7 @@ export default function DashboardContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [showUserMenu, setShowUserMenu] = useState(false)
+  const [showUserInfoModal, setShowUserInfoModal] = useState(false)
   const [userInfo, setUserInfo] = useState<any>(null)
 
   useEffect(() => {
@@ -61,10 +62,50 @@ export default function DashboardContent() {
           setIsLoggedIn(false)
         }
 
-        // 반려견 정보 불러오기 (새로운 저장 방식)
-        const savedPetInfo = localStorage.getItem('registeredPetInfo')
-        if (savedPetInfo) {
-          setPetInfo(JSON.parse(savedPetInfo))
+        // 반려견 정보 불러오기 (백엔드 API 우선, localStorage 백업)
+        if (userLoggedIn) {
+          try {
+            const dogInfo = await dogApi.getDogInfo()
+            if (dogInfo) {
+              // 백엔드 응답을 프론트엔드 형태로 변환
+              const petData = {
+                id: dogInfo.id,
+                name: dogInfo.name,
+                birthday: dogInfo.birth_date,
+                breedId: null, // breed_name을 통해 breed_id 찾기 필요
+                gender: dogInfo.gender,
+                weight: dogInfo.weight,
+                ageGroup: dogInfo.age_group,
+                medicine: dogInfo.medication,
+                breed: dogInfo.breed_name, // 대시보드에서는 breed 이름 표시
+                allergy_names: dogInfo.allergy_names,
+                disease_names: dogInfo.disease_names
+              }
+              setPetInfo(petData)
+              
+              // 백엔드 데이터를 localStorage에도 백업 저장
+              localStorage.setItem('registeredPetInfo', JSON.stringify(petData))
+            } else {
+              // 백엔드에 반려견 정보가 없으면 localStorage 확인
+              const savedPetInfo = localStorage.getItem('registeredPetInfo')
+              if (savedPetInfo) {
+                setPetInfo(JSON.parse(savedPetInfo))
+              }
+            }
+          } catch (error) {
+            console.error("백엔드에서 반려견 정보 로드 실패:", error)
+            // 백엔드 실패 시 localStorage에서 데이터 로드
+            const savedPetInfo = localStorage.getItem('registeredPetInfo')
+            if (savedPetInfo) {
+              setPetInfo(JSON.parse(savedPetInfo))
+            }
+          }
+        } else {
+          // 비로그인 상태에서는 localStorage만 확인
+          const savedPetInfo = localStorage.getItem('registeredPetInfo')
+          if (savedPetInfo) {
+            setPetInfo(JSON.parse(savedPetInfo))
+          }
         }
 
         // 약 정보 불러오기 (API 호출) - 로그인 상태에서만
@@ -78,17 +119,130 @@ export default function DashboardContent() {
           }
         }
 
-        // 건강 데이터 불러오기
-        const savedHealthData = getData("healthData")
-        if (savedHealthData) {
-          setHealthData(savedHealthData)
-        }
+        // 건강 데이터 불러오기 (백엔드 API 사용) - 로그인 상태에서만
+        if (userLoggedIn) {
+          try {
+            // 오늘 건강체크 데이터 확인
+            const todayHealthChecks = await healthApi.getTodayHealthChecks()
+            setTodayChecked(todayHealthChecks.length > 0)
+            console.log('오늘 건강체크 기록:', todayHealthChecks.length, '개')
 
-        // 오늘의 체크 여부 확인
-        const today = new Date()
-        const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`
-        const todayCheck = getData(`dailyCheck_${formattedDate}`)
-        setTodayChecked(!!todayCheck)
+            // 모든 건강 기록들을 가져와서 활동 데이터 구성
+            const allHealthChecks = await healthApi.getHealthChecks()
+            const walkRecords = await healthApi.getWalkRecords()
+            const foodRecords = await healthApi.getFoodRecords()
+            const waterRecords = await healthApi.getWaterRecords()
+            const weightRecords = await healthApi.getWeightRecords()
+
+            // 활동 데이터 통합 (최근 7일)
+            const sevenDaysAgo = new Date()
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+            
+            const activities: any[] = []
+
+            // 건강체크 기록 추가
+            allHealthChecks.forEach((record: any) => {
+              const recordDate = new Date(record.created_at)
+              if (recordDate >= sevenDaysAgo) {
+                // 대시보드 형식 (YYYY.MM.DD)으로 변환
+                const formattedDate = `${recordDate.getFullYear()}.${String(recordDate.getMonth() + 1).padStart(2, "0")}.${String(recordDate.getDate()).padStart(2, "0")}`
+                activities.push({
+                  type: "health",
+                  date: formattedDate,
+                  time: recordDate.toTimeString().substring(0, 5),
+                  description: `${record.category}: ${record.status || '기록됨'}`,
+                  category: record.category,
+                  status: record.status
+                })
+              }
+            })
+
+            // 산책 기록 추가
+            walkRecords.forEach((record: any) => {
+              const recordDate = new Date(record.created_at)
+              if (recordDate >= sevenDaysAgo) {
+                const formattedDate = `${recordDate.getFullYear()}.${String(recordDate.getMonth() + 1).padStart(2, "0")}.${String(recordDate.getDate()).padStart(2, "0")}`
+                activities.push({
+                  type: "walk",
+                  date: formattedDate,
+                  time: recordDate.toTimeString().substring(0, 5),
+                  description: `산책: ${record.distance_km}km, ${record.duration_min}분`,
+                  distance_km: record.distance_km,
+                  duration_min: record.duration_min
+                })
+              }
+            })
+
+            // 사료 기록 추가
+            foodRecords.forEach((record: any) => {
+              const recordDate = new Date(record.created_at)
+              if (recordDate >= sevenDaysAgo) {
+                const formattedDate = `${recordDate.getFullYear()}.${String(recordDate.getMonth() + 1).padStart(2, "0")}.${String(recordDate.getDate()).padStart(2, "0")}`
+                activities.push({
+                  type: "feed",
+                  date: formattedDate,
+                  time: record.time,
+                  description: `사료: ${record.amount_g}g${record.brand ? ` (${record.brand})` : ''}`,
+                  amount_g: record.amount_g,
+                  brand: record.brand
+                })
+              }
+            })
+
+            // 물 기록 추가
+            waterRecords.forEach((record: any) => {
+              const recordDate = new Date(record.created_at)
+              if (recordDate >= sevenDaysAgo) {
+                const formattedDate = `${recordDate.getFullYear()}.${String(recordDate.getMonth() + 1).padStart(2, "0")}.${String(recordDate.getDate()).padStart(2, "0")}`
+                activities.push({
+                  type: "water",
+                  date: formattedDate,
+                  time: recordDate.toTimeString().substring(0, 5),
+                  description: `물 섭취: ${record.amount_ml}ml`,
+                  amount_ml: record.amount_ml
+                })
+              }
+            })
+
+            // 체중 기록 추가
+            weightRecords.forEach((record: any) => {
+              const recordDate = new Date(record.created_at)
+              if (recordDate >= sevenDaysAgo) {
+                const formattedDate = `${recordDate.getFullYear()}.${String(recordDate.getMonth() + 1).padStart(2, "0")}.${String(recordDate.getDate()).padStart(2, "0")}`
+                activities.push({
+                  type: "weight",
+                  date: formattedDate,
+                  time: recordDate.toTimeString().substring(0, 5),
+                  description: `체중 측정: ${record.weight_kg}kg`,
+                  weight_kg: record.weight_kg
+                })
+              }
+            })
+
+            // 날짜순으로 정렬 (최신순)
+            activities.sort((a, b) => {
+              const dateA = new Date(`${a.date} ${a.time}`)
+              const dateB = new Date(`${b.date} ${b.time}`)
+              return dateB.getTime() - dateA.getTime()
+            })
+
+            setHealthData({ activities, healthChecks: allHealthChecks })
+            console.log('백엔드에서 가져온 활동 기록:', activities.length, '개')
+
+          } catch (error) {
+            console.error("건강 데이터 조회 실패:", error)
+            // API 실패 시 로컬 스토리지 백업 사용
+            const savedHealthData = getData("healthData")
+            if (savedHealthData) {
+              setHealthData(savedHealthData)
+            }
+            
+            const today = new Date()
+            const formattedDate = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, "0")}.${String(today.getDate()).padStart(2, "0")}`
+            const todayCheck = getData(`dailyCheck_${formattedDate}`)
+            setTodayChecked(!!todayCheck)
+          }
+        }
 
       } catch (error) {
         console.error("데이터 로딩 중 오류:", error)
@@ -194,6 +348,18 @@ export default function DashboardContent() {
     show: { y: 0, opacity: 1 },
   }
 
+  // 날짜 포맷팅 함수
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "정보 없음"
+    
+    try {
+      const date = new Date(dateString)
+      return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
+    } catch (error) {
+      return "정보 없음"
+    }
+  }
+
   return (
     <div className="min-h-screen bg-pink-50 dashboard-landscape overflow-y-auto">
       {/* 상단: 로고, 반려견 프로필, 설정 및 로그아웃 */}
@@ -240,7 +406,10 @@ export default function DashboardContent() {
                       </div>
                     </Link>
                     <button
-                      onClick={() => setShowUserMenu(false)}
+                      onClick={() => {
+                        setShowUserMenu(false)
+                        setShowUserInfoModal(true)
+                      }}
                       className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded"
                     >
                       <User className="w-4 h-4" />
@@ -548,6 +717,83 @@ export default function DashboardContent() {
           </>
         )}
       </motion.div>
+
+      {/* 사용자 정보 모달 */}
+      {showUserInfoModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4"
+          >
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800">내 정보</h2>
+              <button
+                onClick={() => setShowUserInfoModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 모달 내용 */}
+            <div className="p-6 space-y-6">
+              {userInfo && (
+                <>
+                  {/* 프로필 아이콘 */}
+                  <div className="flex justify-center">
+                    <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center">
+                      <User className="w-10 h-10 text-pink-500" />
+                    </div>
+                  </div>
+
+                  {/* 사용자 정보 */}
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">닉네임</label>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-800 font-medium">{userInfo.nickname}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">이메일</label>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-800">{userInfo.email}</p>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-500 mb-1">가입일</label>
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <p className="text-gray-800">{formatDate(userInfo.created_at)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* 로그아웃 버튼 */}
+            <div className="p-6 pt-0">
+              <button
+                onClick={() => {
+                  setShowUserInfoModal(false)
+                  handleLogout()
+                }}
+                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                로그아웃
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
