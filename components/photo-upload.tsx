@@ -51,9 +51,12 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
   }
 
   const handleRemoveImage = () => {
-    setPreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ""
-    if (onImageChange) onImageChange(null)
+    // 이미지 삭제 확인
+    if (confirm('이미지를 삭제하시겠습니까?\n(백엔드에서도 완전히 삭제됩니다)')) {
+      setPreview(null)
+      if (fileInputRef.current) fileInputRef.current.value = ""
+      if (onImageChange) onImageChange(null)
+    }
   }
 
   const triggerFileInput = () => {

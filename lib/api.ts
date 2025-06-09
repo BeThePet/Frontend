@@ -974,13 +974,29 @@ export const dogApi = {
 
   // 반려견 프로필 이미지 삭제
   deleteDogImage: async (): Promise<void> => {
+    console.log('🗑️ 이미지 삭제 API 호출 시작')
+    
     const response = await apiCallWithRetry('/dog-image/', {
       method: 'DELETE',
     })
     
     if (!response.ok) {
-      throw new Error('Failed to delete dog image')
+      console.error('❌ 이미지 삭제 실패:', {
+        status: response.status,
+        statusText: response.statusText
+      })
+      
+      try {
+        const errorData = await response.json()
+        console.error('❌ 삭제 에러 응답 상세:', errorData)
+        throw new Error(errorData.detail || `Delete failed: ${response.status} ${response.statusText}`)
+      } catch (parseError) {
+        console.error('❌ 삭제 에러 응답 파싱 실패:', parseError)
+        throw new Error(`Delete failed: ${response.status} ${response.statusText}`)
+      }
     }
+    
+    console.log('✅ 이미지 삭제 API 성공')
   }
 }
 

@@ -279,7 +279,7 @@ export default function InfoContent() {
     setPetInfo((prev) => ({ ...prev, breedId }))
   }
 
-    const handleImageChange = (file: File | null) => {
+  const handleImageChange = (file: File | null) => {
     if (file) {
       // 파일 크기 체크 (5MB 제한)
       const maxSize = 5 * 1024 * 1024 // 5MB
@@ -313,8 +313,15 @@ export default function InfoContent() {
         setProfileImageUrl(localPreviewUrl)
       }
     } else {
-      setProfileImageUrl("")
-      setPendingImageFile(null)
+      // 이미지 삭제 요청
+      if (isEditMode && profileImageUrl) {
+        // 수정 모드이고 기존 이미지가 있으면 백엔드에서 삭제
+        handleImageDelete()
+      } else {
+        // 등록 모드이거나 이미지가 없으면 로컬 상태만 초기화
+        setProfileImageUrl("")
+        setPendingImageFile(null)
+      }
     }
   }
 
@@ -360,6 +367,37 @@ export default function InfoContent() {
       toast({
         title: "이미지 업로드 실패",
         description: "이미지 업로드 중 오류가 발생했습니다. 다시 시도해주세요.",
+        variant: "destructive",
+      })
+    } finally {
+      setIsUploadingImage(false)
+    }
+  }
+
+  const handleImageDelete = async () => {
+    try {
+      setIsUploadingImage(true)
+      console.log("🗑️ 이미지 삭제 시작")
+      
+      // 백엔드에서 이미지 삭제
+      await dogApi.deleteDogImage()
+      
+      // 상태 초기화 (초기 등록 전 상태로)
+      setProfileImageUrl("")
+      setPendingImageFile(null)
+      
+      toast({
+        title: "이미지 삭제 완료",
+        description: "반려견 사진이 성공적으로 삭제되었습니다.",
+      })
+      
+      console.log("✅ 이미지 삭제 성공")
+      
+    } catch (error) {
+      console.error("❌ 이미지 삭제 실패:", error)
+      toast({
+        title: "이미지 삭제 실패",
+        description: "이미지 삭제 중 오류가 발생했습니다. 다시 시도해주세요.",
         variant: "destructive",
       })
     } finally {
