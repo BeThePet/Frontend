@@ -140,16 +140,16 @@ export default function PhotoUpload({ initialImage, onImageChange, className = "
         />
 
         <AnimatePresence>
-          {!isLoading && (
+          {!isLoading && canEdit && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
               <Button
                 type="button"
                 onClick={triggerFileInput}
                 variant="outline"
                 size="sm"
-                className="mt-2 rounded-full border-[#D6ECFA] text-gray-700 flex items-center gap-1 shadow-sm"
+                className="mt-2 rounded-full border-[#D6ECFA] text-gray-700 flex items-center gap-1 shadow-sm text-xs px-3 py-1"
               >
-                <Upload className="w-4 h-4" />
+                <Upload className="w-3 h-3" />
                 <span>사진 {preview ? "변경" : "추가"}</span>
               </Button>
             </motion.div>

@@ -4,12 +4,13 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
-import { ArrowLeft, Edit, Trash2, Dog, Heart, Calendar, Scale, Pill, User } from "lucide-react"
+import { ArrowLeft, Edit, Trash2, Dog, Heart, Calendar, Scale, Pill, User, X } from "lucide-react"
 import PhotoUpload from "../photo-upload"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { dogApi, BreedOption, AllergyCategory, DiseaseCategory } from "@/lib/api"
+import { motion } from "framer-motion"
 
 export default function PetDetailContent() {
   const router = useRouter()
@@ -17,6 +18,7 @@ export default function PetDetailContent() {
   const [petInfo, setPetInfo] = useState<any>(null)
   const [petProfileImageUrl, setPetProfileImageUrl] = useState<string>("")
   const [imageLoadError, setImageLoadError] = useState(false)
+  const [showImageModal, setShowImageModal] = useState(false)
   const [breeds, setBreeds] = useState<BreedOption[]>([])
   const [allergyCategories, setAllergyCategories] = useState<AllergyCategory[]>([])
   const [diseaseCategories, setDiseaseCategories] = useState<DiseaseCategory[]>([])
@@ -253,12 +255,23 @@ export default function PetDetailContent() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
-              <PhotoUpload
-                size="lg"
-                initialImage={petProfileImageUrl || undefined}
-                canEdit={false}
-                className="w-24 h-24"
-              />
+              <div 
+                className="w-24 h-24 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200 shadow-lg cursor-pointer hover:ring-pink-300 transition-all"
+                onClick={() => setShowImageModal(true)}
+              >
+                {petProfileImageUrl && !imageLoadError ? (
+                  <Image
+                    src={petProfileImageUrl}
+                    alt={petInfo.name}
+                    width={96}
+                    height={96}
+                    className="rounded-full object-cover w-full h-full"
+                    onError={() => setImageLoadError(true)}
+                  />
+                ) : (
+                  <Dog className="w-12 h-12 text-pink-400" />
+                )}
+              </div>
               <div className="flex-1">
                 <h3 className="text-2xl font-bold text-gray-800 mb-1">{petInfo.name}</h3>
                 <p className="text-gray-600 mb-2">{petInfo.breed || getBreedName(petInfo.breedId)}</p>
@@ -376,6 +389,48 @@ export default function PetDetailContent() {
           </CardContent>
         </Card>
       </div>
+
+      {/* 이미지 모달 */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ type: "spring", duration: 0.5 }}
+            className="relative max-w-4xl max-h-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* 닫기 버튼 */}
+            <Button
+              onClick={() => setShowImageModal(false)}
+              size="sm"
+              variant="ghost"
+              className="absolute top-4 right-4 z-10 bg-white/90 hover:bg-white text-gray-700 rounded-full shadow-lg"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+
+            {/* 이미지 */}
+            <div className="relative w-full h-[80vh] rounded-2xl overflow-hidden shadow-2xl bg-white">
+              {petProfileImageUrl && !imageLoadError ? (
+                <Image
+                  src={petProfileImageUrl}
+                  alt={petInfo.name}
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 80vw, 70vw"
+                  priority
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Dog className="w-24 h-24 text-pink-400" />
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }

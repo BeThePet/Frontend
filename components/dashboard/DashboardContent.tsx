@@ -47,6 +47,7 @@ export default function DashboardContent() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showUserInfoModal, setShowUserInfoModal] = useState(false)
   const [userInfo, setUserInfo] = useState<any>(null)
+  const [showImageModal, setShowImageModal] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -448,12 +449,23 @@ export default function DashboardContent() {
           <div className="mt-4 bg-white p-4 rounded-xl shadow-sm border-2 border-pink-100">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <PhotoUpload
-                  size="md"
-                  initialImage={petProfileImageUrl || undefined}
-                  canEdit={false}
-                  className="w-20 h-20"
-                />
+                <div 
+                  className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center overflow-hidden ring-2 ring-pink-200 cursor-pointer hover:ring-pink-300 transition-all"
+                  onClick={() => setShowImageModal(true)}
+                >
+                  {petProfileImageUrl && !imageLoadError ? (
+                    <Image
+                      src={petProfileImageUrl}
+                      alt={petInfo.name || "반려견"}
+                      width={80}
+                      height={80}
+                      className="rounded-full object-cover w-full h-full"
+                      onError={() => setImageLoadError(true)}
+                    />
+                  ) : (
+                    <Dog className="w-10 h-10 text-pink-400" />
+                  )}
+                </div>
                 {/* 온라인 표시 (선택적) */}
                 <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
                   <PawPrint className="w-3 h-3 text-white" />
@@ -530,7 +542,7 @@ export default function DashboardContent() {
             <ServiceCard
               href="/emergency"
               icon={<AlertTriangle className="w-6 h-6 text-red-500" />}
-              title="응급가이드"
+              title="응급처치"
             />
           </motion.div>
           <motion.div variants={item}>
@@ -819,6 +831,51 @@ export default function DashboardContent() {
                 <LogOut className="w-4 h-4" />
                 로그아웃
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* 이미지 모달 */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            className="bg-white rounded-2xl shadow-xl max-w-sm w-full mx-4"
+          >
+            {/* 모달 헤더 */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-100">
+              <h2 className="text-xl font-bold text-gray-800">반려견 프로필</h2>
+              <button
+                onClick={() => setShowImageModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* 모달 내용 */}
+            <div className="p-6 space-y-6">
+              {petProfileImageUrl && !imageLoadError ? (
+                <Image
+                  src={petProfileImageUrl}
+                  alt={petInfo.name || "반려견"}
+                  width={300}
+                  height={300}
+                  className="rounded-lg object-cover w-full h-full"
+                  onError={() => setImageLoadError(true)}
+                />
+              ) : (
+                <div className="flex justify-center">
+                  <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center">
+                    <Dog className="w-10 h-10 text-pink-400" />
+                  </div>
+                </div>
+              )}
             </div>
           </motion.div>
         </div>

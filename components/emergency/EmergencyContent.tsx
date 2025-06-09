@@ -26,16 +26,27 @@ export default function EmergencyContent() {
         setIsLoading(true)
         setIsLoadingGuides(true)
         
-        // 응급 병원 요약 정보와 응급 가이드를 동시에 불러오기
+        // 기존 로컬스토리지 테스트 데이터 정리
+        localStorage.removeItem('emergencyGuides')
+        localStorage.removeItem('emergencyHospitals')
+        localStorage.removeItem('testData')
+        
+        // 응급 병원 요약 정보와 응급 가이드를 동시에 불러오기 (백엔드 API만 사용)
         const [emergencyHospitalsSummary, guides] = await Promise.all([
-          emergencyApi.getEmergencyHospitalsSummary(), // 업데이트된 API 함수 사용
+          emergencyApi.getEmergencyHospitalsSummary(),
           emergencyApi.getGuides()
         ])
+        
+        console.log('🚑 응급가이드 로드:', guides)
+        console.log('🏥 응급병원 로드:', emergencyHospitalsSummary)
         
         setEmergencyHospitals(emergencyHospitalsSummary)
         setEmergencyGuides(guides)
       } catch (error) {
-        console.error("데이터를 불러오는 중 오류가 발생했습니다:", error)
+        console.error("백엔드에서 응급 데이터를 불러오는 중 오류:", error)
+        // 백엔드 실패 시 빈 배열로 설정 (하드코딩 데이터 사용 안함)
+        setEmergencyHospitals([])
+        setEmergencyGuides([])
       } finally {
         setIsLoading(false)
         setIsLoadingGuides(false)
