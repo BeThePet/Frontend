@@ -855,41 +855,108 @@ export const dogApi = {
 
   // 반려견 프로필 이미지 업로드 (첫 업로드)
   uploadDogImage: async (file: File): Promise<{ profile_image_url: string }> => {
+    console.log('🖼️ 이미지 업로드 시작:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    })
+
+    // 먼저 반려견 정보가 있는지 확인
+    try {
+      const dogInfo = await dogApi.getDogInfo()
+      if (!dogInfo) {
+        throw new Error('반려견 정보를 먼저 등록해주세요.')
+      }
+      console.log('✅ 반려견 정보 확인됨:', dogInfo.name)
+    } catch (error) {
+      console.warn('⚠️ 반려견 정보 확인 실패:', error)
+      // 반려견 정보가 없어도 이미지 업로드는 시도해보기
+    }
+
     const formData = new FormData()
     formData.append('file', file)
+    
+    // FormData 내용 로그
+    console.log('📦 FormData 내용:')
+    for (let [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value instanceof File ? `[File: ${value.name}, ${value.size}bytes]` : value)
+    }
     
     const response = await apiCallWithRetry('/dog-image/', {
       method: 'POST',
       body: formData,
-      // multipart/form-data는 브라우저가 자동으로 Content-Type 설정
-      headers: {} // Content-Type 헤더를 명시적으로 설정하지 않음
+      headers: {
+        // Content-Type은 브라우저가 자동으로 multipart/form-data; boundary=... 설정
+        // 명시적으로 설정하면 boundary가 누락될 수 있으므로 제거
+      }
     })
     
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.detail || 'Failed to upload image')
+      console.error('❌ 이미지 업로드 실패:', {
+        status: response.status,
+        statusText: response.statusText
+      })
+      
+      try {
+        const errorData = await response.json()
+        console.error('❌ 에러 응답 상세:', errorData)
+        throw new Error(errorData.detail || `Upload failed: ${response.status} ${response.statusText}`)
+      } catch (parseError) {
+        console.error('❌ 에러 응답 파싱 실패:', parseError)
+        throw new Error(`Upload failed: ${response.status} ${response.statusText}`)
+      }
     }
     
-    return response.json()
+    const result = await response.json()
+    console.log('✅ 이미지 업로드 성공:', result)
+    return result
   },
 
   // 반려견 프로필 이미지 교체
   updateDogImage: async (file: File): Promise<{ profile_image_url: string }> => {
+    console.log('🔄 이미지 수정 시작:', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    })
+
     const formData = new FormData()
     formData.append('file', file)
+    
+    // FormData 내용 로그
+    console.log('📦 FormData 내용:')
+    for (let [key, value] of formData.entries()) {
+      console.log(`  ${key}:`, value instanceof File ? `[File: ${value.name}, ${value.size}bytes]` : value)
+    }
     
     const response = await apiCallWithRetry('/dog-image/', {
       method: 'PUT',
       body: formData,
-      headers: {}
+      headers: {
+        // multipart/form-data 헤더를 명시적으로 설정하지 않음 (브라우저가 boundary 포함해서 자동 설정)
+        // 'Content-Type': 'multipart/form-data' // 이렇게 설정하면 boundary가 누락되어 오히려 문제가 됨
+      }
     })
     
     if (!response.ok) {
-      const errorData = await response.json()
-      throw new Error(errorData.detail || 'Failed to update image')
+      console.error('❌ 이미지 수정 실패:', {
+        status: response.status,
+        statusText: response.statusText
+      })
+      
+      try {
+        const errorData = await response.json()
+        console.error('❌ 에러 응답 상세:', errorData)
+        throw new Error(errorData.detail || `Update failed: ${response.status} ${response.statusText}`)
+      } catch (parseError) {
+        console.error('❌ 에러 응답 파싱 실패:', parseError)
+        throw new Error(`Update failed: ${response.status} ${response.statusText}`)
+      }
     }
     
-    return response.json()
+    const result = await response.json()
+    console.log('✅ 이미지 수정 성공:', result)
+    return result
   },
 
   // 반려견 프로필 이미지 URL 조회
